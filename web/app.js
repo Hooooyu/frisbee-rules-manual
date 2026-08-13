@@ -14,12 +14,26 @@
   let current = data.documents[0];
 
   const escape = (value) => String(value).replace(/[&<>"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[character]);
-  const bilingualTitle = (value) => {
-    const match = String(value).match(/^(.*?)\s*[（(]([^()（）]*[A-Za-z][^()（）]*)[）)]$/);
-    return match ? { zh: match[1], en: match[2] } : { zh: value, en: "" };
+  const annotationEnglishTitles = {
+    Introduction: "Introduction", Principles: "Principles",
+    1: "Spirit of the Game", 2: "Playing Field", 3: "Equipment",
+    4: "Point, Goal and Game", 5: "Teams", 6: "Starting a Game",
+    7: "The Pull", 8: "State of Play", 9: "Stall Count", 10: "Check",
+    11: "Out-of-Bounds", 12: "Receivers and Positioning", 13: "Turnovers",
+    14: "Scoring", 15: "Calling Fouls, Infractions and Violations",
+    16: "Continuation after a Call", 17: "Fouls", 18: "Infractions and Violations",
+    19: "Safety Stoppages", 20: "Time-Outs"
   };
-  const titleMarkup = (value, className) => {
-    const { zh, en } = bilingualTitle(value);
+  const bilingualTitle = (value, fallbackEnglish = "") => {
+    const match = String(value).match(/^(.*?)\s*[（(]([^()（）]*[A-Za-z][^()（）]*)[）)]$/);
+    return match ? { zh: match[1], en: match[2] } : { zh: value, en: fallbackEnglish };
+  };
+  const sectionEnglishTitle = (section) => {
+    if (current?.id === "annotations") return annotationEnglishTitles[section.key] || "";
+    return data.documents.find((item) => item.id === "rules")?.sections.find((item) => item.key === section.key)?.title.match(/[（(]([^()（）]*[A-Za-z][^()（）]*)[）)]$/)?.[1] || "";
+  };
+  const titleMarkup = (value, className, fallbackEnglish = "") => {
+    const { zh, en } = bilingualTitle(value, fallbackEnglish);
     return `<span class="${className}"><span class="${className}-zh">${escape(zh)}</span>${en ? `<span class="${className}-en" lang="en">${escape(en)}</span>` : ""}</span>`;
   };
   const sectionKey = (section) => ["Introduction", "Definitions", "Legal License"].includes(section.key) || section.key.startsWith("appendix-") ? "" : section.key;
@@ -46,7 +60,7 @@
       const hasChildren = section.key.startsWith("appendix-") && new RegExp(`^${section.key.at(-1).toUpperCase()}\\d`).test(nextKey);
       if (label) return hasChildren ? `<h3 class="toc-chapter">${escape(label)}</h3>` : `<a class="toc-chapter toc-chapter-link" href="#${section.id}">${escape(label)}</a>`;
       const key = sectionKey(section);
-      return `<a class="${key ? "" : "toc-group"}" href="#${section.id}">${key ? `<span class="toc-key">${escape(key)}</span>` : ""}${titleMarkup(section.title, "toc-title")}</a>`;
+      return `<a class="${key ? "" : "toc-group"}" href="#${section.id}">${key ? `<span class="toc-key">${escape(key)}</span>` : ""}${titleMarkup(section.title, "toc-title", sectionEnglishTitle(section))}</a>`;
     }).join("");
     reader.classList.remove("show-source");
     sourceToggle.setAttribute("aria-pressed", "false");
@@ -55,7 +69,7 @@
       const diagram = section.image ? `<div class="diagram-reader"><p>${escape(section.description)}</p><button type="button" data-image="${section.image}" data-source-image="${section.sourceImage}" data-alt="${escape(section.alt)}"><img class="translated-diagram" src="${section.image}" alt="${escape(section.alt)}"><img class="source-diagram" src="${section.sourceImage}" alt="${escape(section.alt)} 英文原图"></button></div>` : "";
       const figure = section.figure ? `<figure class="rule-figure"><figcaption>${escape(section.figure.description)}</figcaption><button type="button" data-image="${section.figure.image}" data-source-image="${section.figure.sourceImage}" data-alt="${escape(section.figure.alt)}"><img class="translated-diagram" src="${section.figure.image}" alt="${escape(section.figure.alt)}"><img class="source-diagram" src="${section.figure.sourceImage}" alt="${escape(section.figure.alt)} 英文原图"></button></figure>` : "";
       const content = section.paragraphs.map(renderParagraph).join("");
-      return `<section class="rule-section" id="${section.id}"><h2><span class="section-number">${escape(sectionKey(section))}</span>${titleMarkup(displaySectionTitle(section), "section-title")}</h2>${diagram}${content}${figure}</section>`;
+      return `<section class="rule-section" id="${section.id}"><h2><span class="section-number">${escape(sectionKey(section))}</span>${titleMarkup(displaySectionTitle(section), "section-title", sectionEnglishTitle(section))}</h2>${diagram}${content}${figure}</section>`;
     }).join("") || '<p class="empty">此文件正在整理为网页结构。请暂时使用上方的 WFDF 原版文档入口。</p>';
     window.location.hash = "top";
   }

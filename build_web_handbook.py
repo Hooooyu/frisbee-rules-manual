@@ -39,7 +39,7 @@ DOCUMENTS = (
     {
         "id": "appendix",
         "label": "附录 v2.0",
-        "title": "WFDF 附加锦标赛规则",
+        "title": "WFDF 极限飞盘规则附录",
         "subtitle": "Appendix v2.0",
         "effective": "2026 年 1 月 1 日生效",
         "source": "WFDF-Rules-of-Ultimate-2025-2028-Appendix-v2.0.pdf",
@@ -469,7 +469,7 @@ def reviewed_annotations() -> tuple[dict[str, str], dict[str, object]]:
         if line == "# 引言":
             started = True
             current_section, current_number = "Introduction", None
-            titles[current_section] = "引言"
+            titles[current_section] = "引言（Introduction）"
             continue
         if not started or not line or line.startswith(">") or line == "---":
             continue
@@ -478,13 +478,13 @@ def reviewed_annotations() -> tuple[dict[str, str], dict[str, object]]:
             continue
         if line == "# 原则":
             current_section, current_number = "Principles", None
-            titles[current_section] = "原则"
+            titles[current_section] = "原则（Principles）"
             continue
 
         chapter = re.match(r"^# (\d+)\.\s*(.+)$", line)
         if chapter:
             current_section, current_number = chapter.groups()[0], None
-            titles[current_section] = plain(chapter.groups()[1])
+            titles[current_section] = MAIN_TITLES.get(current_section, plain(chapter.groups()[1]))
             content.setdefault(current_section, {})
             continue
 
@@ -651,7 +651,7 @@ def section_heading(meta: dict, x: float, text: str) -> tuple[str, str] | None:
     if meta["kind"] == "appendix":
         match = re.match(r"^Appendix ([A-H]):\s+(.+)$", text)
         if x < 80 and match:
-            titles = {"A": "WFDF 锦标赛比赛附加规则", "B": "WFDF 锦标赛赛事附加规则", "C": "队服要求", "D": "WFDF 参赛资格与名单指南", "E": "种子、赛程与赛事席位", "F": "手势", "G": "许可条款", "H": "致谢"}
+            titles = {"A": "WFDF 比赛附加规则", "B": "WFDF 赛事附加规则", "C": "队服要求", "D": "WFDF 参赛资格与名单指南", "E": "种子、赛程与赛事席位", "F": "手势", "G": "许可条款", "H": "致谢"}
             return f"appendix-{match.group(1).lower()}", titles[match.group(1)]
         match = re.match(r"^([A-H]\d+)\.\s+(.+)$", text)
         if x < 80 and match:
@@ -863,8 +863,8 @@ def section_for(kind: str, raw: str) -> tuple[str | None, str | None, str]:
         if appendix_heading:
             key, english = appendix_heading.groups()
             titles = {
-                "A": "WFDF 锦标赛比赛附加规则",
-                "B": "WFDF 锦标赛赛事附加规则",
+                "A": "WFDF 比赛附加规则",
+                "B": "WFDF 赛事附加规则",
                 "C": "队服要求",
                 "D": "WFDF 参赛资格与名单指南",
                 "E": "种子、赛程与赛事席位",

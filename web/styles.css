@@ -42,7 +42,7 @@ button { cursor: pointer; }
 .toc-chapter:first-child { margin-top: .25rem; }
 .table-of-contents a.toc-chapter-link { display: block; padding: 0; text-decoration: none; }
 .table-of-contents a.toc-chapter-link:hover { color: var(--green-mid); border-left-color: transparent; text-decoration: underline; }
-.table-of-contents a { display: grid; grid-template-columns: 2rem minmax(0, 1fr); align-items: start; padding: .42rem .7rem; color: var(--muted); text-decoration: none; line-height: 1.25; border-left: 1px solid transparent; }
+.table-of-contents a { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; padding: .42rem .7rem; color: var(--muted); text-decoration: none; line-height: 1.25; border-left: 1px solid transparent; }
 .table-of-contents a.toc-group { grid-template-columns: minmax(0, 1fr); }
 .table-of-contents a:hover { color: var(--green); border-left-color: var(--green-mid); }
 .toc-key { padding-top: .08rem; color: var(--green); font-size: .76rem; font-weight: 700; font-variant-numeric: tabular-nums; }
