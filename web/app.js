@@ -173,13 +173,19 @@
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") setTocOpen(false); });
 
   // 顶栏按钮受挤压时自动切换紧凑版（文字→EN/图标），空间恢复后还原
-  // nowrap 按钮不会自身收缩，挤压表现为顶栏整体横向溢出，故检测 topbar 的 scrollWidth
+  // 搜索框为 flex 可收缩项，顶栏不再横向溢出，scrollWidth 检测失效；
+  // 改为估算固定项（wordmark + 两个按钮 + 间距）所需宽度，剩余不够搜索框最小可用宽度时切换紧凑版
   const topbar = document.querySelector(".topbar");
   const compactible = [sourceToggle, tocToggle].filter(Boolean);
+  const MIN_SEARCH_WIDTH = 150; // 搜索框保持可用的最小宽度（px）
   const updateCompactButtons = () => {
     if (!topbar) return;
     compactible.forEach((button) => button.classList.remove("is-compact"));
-    if (topbar.scrollWidth > topbar.clientWidth + 1) {
+    const styles = getComputedStyle(topbar);
+    const gap = parseFloat(styles.columnGap || styles.gap) || 0;
+    const fixedWidth = Array.from(topbar.querySelectorAll(".wordmark, .toc-toggle, .source-toggle"))
+      .reduce((sum, el) => sum + el.offsetWidth + gap, parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight));
+    if (topbar.clientWidth < fixedWidth + MIN_SEARCH_WIDTH) {
       compactible.forEach((button) => button.classList.add("is-compact"));
     }
   };

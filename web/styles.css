@@ -14,6 +14,7 @@
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); line-height: 1.7; }
+html, body { overflow-x: clip; }
 a { color: inherit; }
 button, input { font: inherit; }
 .skip-link { position: fixed; left: 1rem; top: -4rem; z-index: 20; padding: .5rem .85rem; background: var(--lime); }
@@ -41,7 +42,7 @@ button { cursor: pointer; }
 .source-toggle.is-compact .label-full { display: none; }
 .source-toggle.is-compact .label-short { display: inline; }
 
-.shell { display: grid; grid-template-columns: 280px minmax(0, 1fr); max-width: 1600px; min-height: calc(100vh - 76px); margin: 0 auto; }
+.shell { display: grid; grid-template-columns: 280px minmax(0, 1fr); max-width: 1600px; min-height: calc(100vh - 76px); margin: 0; }
 .sidebar { position: sticky; top: 76px; height: calc(100vh - 76px); overflow-y: auto; padding: 2rem 1.4rem 2rem 3vw; border-right: 1px solid var(--line); }
 .documents { display: grid; gap: .35rem; margin-bottom: 1.75rem; }
 .document-button { width: 100%; padding: .6rem .7rem; color: var(--muted); text-align: left; background: none; border: 0; border-left: 2px solid transparent; font-size: .9rem; }
@@ -137,17 +138,18 @@ dialog { width: min(98vw, 1200px); padding: .6rem; background: #111; border: 0; 
 dialog::backdrop { background: rgb(0 0 0 / .75); }
 dialog img { display: block; width: 100%; max-height: 88vh; object-fit: contain; }
 dialog button { position: fixed; right: 1rem; top: 1rem; width: 2.6rem; height: 2.6rem; color: white; background: rgb(0 0 0 / .7); border: 1px solid #777; border-radius: 50%; font-size: 1.5rem; }
-footer { max-width: 1600px; margin: 0 auto; padding: 2rem 3vw; color: #e5ebe5; background: var(--green); font-size: .77rem; }
+footer { max-width: 1600px; margin: 0; padding: 2rem 3vw; color: #e5ebe5; background: var(--green); font-size: .77rem; }
 footer p { margin: .25rem 0; }
 
 @media (max-width: 900px) {
-  .topbar { height: auto; min-height: 64px; padding: .7rem 1rem; }
+  .topbar { height: auto; min-height: 64px; padding: .7rem 1rem; gap: .7rem; }
   .wordmark span { font-size: 1.55rem; }
-  .search-wrap { width: min(47vw, 280px); }
+  .topbar-actions { flex: 1; min-width: 0; gap: .5rem; }
+  .search-wrap { flex: 1; width: auto; min-width: 0; }
   .source-toggle { padding: .45rem .55rem; font-size: .7rem; white-space: nowrap; }
   .shell { display: block; }
   .toc-toggle { display: inline-block; order: -1; padding: .5rem .65rem; color: var(--ink); background: transparent; border: 1px solid var(--ink); font-size: .78rem; font-weight: 700; white-space: nowrap; }
-  .sidebar { position: fixed; z-index: 30; inset: 0 auto 0 0; width: min(86vw, 340px); height: 100dvh; padding: 5.4rem 1rem 1.5rem; overflow-y: auto; background: var(--paper); border-right: 1px solid var(--line); box-shadow: 16px 0 40px rgb(14 33 24 / .16); transform: translateX(-105%); transition: transform .24s ease; }
+  .sidebar { position: fixed; z-index: 30; top: 0; bottom: 0; left: 0; width: min(86vw, 340px); height: auto; padding: calc(1.4rem + env(safe-area-inset-top, 0px)) 1rem calc(1.5rem + env(safe-area-inset-bottom, 0px)); overflow-y: auto; background: var(--paper); border-right: 1px solid var(--line); box-shadow: 16px 0 40px rgb(14 33 24 / .16); transform: translateX(-105%); transition: transform .24s ease; }
   body.toc-open { overflow: hidden; }
   body.toc-open .sidebar { transform: translateX(0); }
   body.toc-open .sidebar-backdrop { display: block; position: fixed; z-index: 20; inset: 0; width: 100%; height: 100%; padding: 0; background: rgb(14 33 24 / .38); border: 0; }
@@ -166,8 +168,9 @@ footer p { margin: .25rem 0; }
 }
 
 @media (max-width: 520px) {
-  .topbar-actions { flex: 1; justify-content: flex-end; }
-  .search-wrap { width: 100%; }
+  .topbar { padding: .6rem .8rem; gap: .5rem; }
+  .topbar-actions { flex: 1; justify-content: flex-end; min-width: 0; }
+  .search-wrap { width: 100%; min-width: 0; }
   kbd { display: none; }
   .documents { grid-template-columns: 1fr 1fr 1fr; }
   .cover { margin-inline: -1rem; }
