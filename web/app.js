@@ -176,9 +176,12 @@
   search.addEventListener("input", () => searchContent(search.value));
   search.addEventListener("keydown", (event) => { if (event.key === "Escape") { search.value = ""; searchContent(""); search.blur(); } });
   sourceToggle.addEventListener("click", () => {
+    const anchor = [...reader.querySelectorAll(".rule-section, p")].find((element) => { const rect = element.getBoundingClientRect(); return rect.bottom > 96 && rect.top < window.innerHeight * 0.45; });
+    const offset = anchor?.getBoundingClientRect().top || 0;
     const enabled = reader.classList.toggle("show-source");
     sourceToggle.setAttribute("aria-pressed", String(enabled));
     sourceToggle.textContent = enabled ? (current.kind === "diagram" ? "隐藏英文原图" : "隐藏英文原文") : (current.kind === "diagram" ? "显示英文原图" : "显示英文原文");
+    if (anchor) requestAnimationFrame(() => window.scrollBy({ top: anchor.getBoundingClientRect().top - offset, behavior: "auto" }));
   });
   reader.addEventListener("click", (event) => {
     const button = event.target.closest("[data-image]");
