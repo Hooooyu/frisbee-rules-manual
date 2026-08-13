@@ -132,7 +132,12 @@
       target.classList.remove("search-target");
       target.querySelectorAll(".search-keyword").forEach((element) => element.replaceWith(document.createTextNode(element.textContent)));
     }, 3000);
-    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    requestAnimationFrame(() => {
+      const rect = target.getBoundingClientRect();
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      const top = Math.min(maxScroll, Math.max(0, window.scrollY + rect.top + rect.height / 2 - window.innerHeight / 2));
+      window.scrollTo({ top, behavior: "smooth" });
+    });
   }
 
   documentsRoot.addEventListener("click", (event) => {
