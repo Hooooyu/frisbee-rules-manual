@@ -11,6 +11,7 @@ env/
 # Build and temporary files
 tmp/
 output/
+web/downloads/
 *.log
 
 # Local tools and editor/system files
@@ -19,4 +20,3 @@ output/
 Thumbs.db
 .vscode/
 .idea/
-
