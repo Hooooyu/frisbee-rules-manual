@@ -9,6 +9,7 @@
   const search = document.querySelector("#search");
   const results = document.querySelector("#search-results");
   const sourceToggle = document.querySelector("#source-toggle");
+  const sourceToggleLabel = sourceToggle.querySelector(".label-full");
   const dialog = document.querySelector("#image-dialog");
   const dialogImage = dialog.querySelector("img");
   const tocToggle = document.querySelector("#toc-toggle");
@@ -72,7 +73,7 @@
     }).join("");
     reader.classList.remove("show-source");
     sourceToggle.setAttribute("aria-pressed", "false");
-    sourceToggle.textContent = document.kind === "diagram" ? "显示英文原图" : "显示英文原文";
+    sourceToggleLabel.textContent = document.kind === "diagram" ? "显示英文原图" : "显示英文原文";
     reader.innerHTML = document.sections.map((section) => {
       const diagram = section.image ? `<div class="diagram-reader"><p>${escape(section.description)}</p><button type="button" data-image="${section.image}" data-source-image="${section.sourceImage}" data-alt="${escape(section.alt)}"><img class="translated-diagram" src="${section.image}" alt="${escape(section.alt)}"><img class="source-diagram" src="${section.sourceImage}" alt="${escape(section.alt)} 英文原图"></button></div>` : "";
       const figure = section.figure ? `<figure class="rule-figure"><figcaption>${escape(section.figure.description)}</figcaption><button type="button" data-image="${section.figure.image}" data-source-image="${section.figure.sourceImage}" data-alt="${escape(section.figure.alt)}"><img class="translated-diagram" src="${section.figure.image}" alt="${escape(section.figure.alt)}"><img class="source-diagram" src="${section.figure.sourceImage}" alt="${escape(section.figure.alt)} 英文原图"></button></figure>` : "";
@@ -171,6 +172,21 @@
   sidebarBackdrop?.addEventListener("click", () => setTocOpen(false));
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") setTocOpen(false); });
 
+  // 顶栏按钮受挤压时自动切换紧凑版（文字→EN/图标），空间恢复后还原
+  // nowrap 按钮不会自身收缩，挤压表现为顶栏整体横向溢出，故检测 topbar 的 scrollWidth
+  const topbar = document.querySelector(".topbar");
+  const compactible = [sourceToggle, tocToggle].filter(Boolean);
+  const updateCompactButtons = () => {
+    if (!topbar) return;
+    compactible.forEach((button) => button.classList.remove("is-compact"));
+    if (topbar.scrollWidth > topbar.clientWidth + 1) {
+      compactible.forEach((button) => button.classList.add("is-compact"));
+    }
+  };
+  if (topbar && "ResizeObserver" in window) new ResizeObserver(updateCompactButtons).observe(topbar);
+  window.addEventListener("resize", updateCompactButtons);
+  updateCompactButtons();
+
   results.addEventListener("click", (event) => {
     const button = event.target.closest("[data-result-document]");
     if (!button) return;
@@ -195,7 +211,7 @@
     const offset = anchor?.getBoundingClientRect().top || 0;
     const enabled = reader.classList.toggle("show-source");
     sourceToggle.setAttribute("aria-pressed", String(enabled));
-    sourceToggle.textContent = enabled ? (current.kind === "diagram" ? "隐藏英文原图" : "隐藏英文原文") : (current.kind === "diagram" ? "显示英文原图" : "显示英文原文");
+    sourceToggleLabel.textContent = enabled ? (current.kind === "diagram" ? "隐藏英文原图" : "隐藏英文原文") : (current.kind === "diagram" ? "显示英文原图" : "显示英文原文");
     if (anchor) requestAnimationFrame(() => window.scrollBy({ top: anchor.getBoundingClientRect().top - offset, behavior: "auto" }));
   });
   reader.addEventListener("click", (event) => {
