@@ -49,10 +49,10 @@
   const sectionName = (section) => `${section.key === "Introduction" ? "" : `${section.key} `}${section.title}`;
   const ruleNumber = (text) => (String(text).match(/^((?:[A-H]?\d+)(?:\.\d+)+)\.\s*/) || [])[1] || "";
   const ruleLevel = (number) => number ? Math.min(number.split(".").length, 5) : 0;
-  function renderParagraph(paragraph) {
+  function renderParagraph(paragraph, index) {
     const number = ruleNumber(paragraph.zh);
-    if (!number) return `<p data-source="${escape(paragraph.en)}">${escape(paragraph.zh)}</p>`;
-    return `<p class="rule-line level-${ruleLevel(number)}" data-source="${escape(paragraph.en)}"><span class="rule-number">${escape(number)}.</span> ${escape(paragraph.zh.slice(number.length + 2).trim())}</p>`;
+    if (!number) return `<p data-search-index="${index}" data-source="${escape(paragraph.en)}">${escape(paragraph.zh)}</p>`;
+    return `<p class="rule-line level-${ruleLevel(number)}" data-search-index="${index}" data-source="${escape(paragraph.en)}"><span class="rule-number">${escape(number)}.</span> ${escape(paragraph.zh.slice(number.length + 2).trim())}</p>`;
   }
 
   function renderDocument(document) {
@@ -91,15 +91,48 @@
     const matches = [];
     data.documents.forEach((document) => document.sections.forEach((section) => {
       const sectionSearchable = `${section.key} ${section.title} ${section.description || ""} ${section.keywords || ""} ${section.sourceKeywords || ""}`.toLocaleLowerCase();
-      if (sectionSearchable.includes(needle)) matches.push({ document, section, paragraph: { zh: section.description || section.title } });
-      section.paragraphs.forEach((paragraph) => {
+      if (sectionSearchable.includes(needle)) matches.push({ document, section, paragraph: { zh: section.description || section.title }, paragraphIndex: -1 });
+      section.paragraphs.forEach((paragraph, paragraphIndex) => {
         const searchable = `${section.key} ${section.title} ${paragraph.zh} ${paragraph.en}`.toLocaleLowerCase();
-        if (searchable.includes(needle)) matches.push({ document, section, paragraph });
+        if (searchable.includes(needle)) matches.push({ document, section, paragraph, paragraphIndex });
       });
     }));
     results.hidden = false;
     const visible = matches.slice(0, 12);
+    visible.forEach((match) => { match.resultParagraph = match.paragraphIndex; match.resultQuery = needle; });
     results.innerHTML = `<p>${matches.length ? `找到 ${matches.length} 条结果` : "没有找到相关规则"}</p>${visible.map((match) => `<button type="button" data-result-document="${match.document.id}" data-result-section="${match.section.id}"><b>${escape(match.document.label)} · ${escape(sectionName(match.section))}</b><span>${escape(match.paragraph.zh)}</span></button>`).join("")}`;
+    results.querySelectorAll("button[data-result-document]").forEach((button, index) => {
+      button.dataset.resultParagraph = String(visible[index].resultParagraph);
+      button.dataset.resultQuery = visible[index].resultQuery;
+    });
+  }
+
+  function highlightSearchTarget(section, paragraphIndex, query) {
+    clearTimeout(searchHighlightTimer);
+    reader.querySelectorAll(".search-target").forEach((element) => element.classList.remove("search-target"));
+    reader.querySelectorAll(".search-keyword").forEach((element) => element.replaceWith(document.createTextNode(element.textContent)));
+    const target = paragraphIndex >= 0 ? section.querySelector(`[data-search-index="${paragraphIndex}"]`) : section.querySelector("h2");
+    if (!target) return;
+    target.classList.add("search-target");
+    const pattern = new RegExp(query.replace(/[.*+?^${}()|[\\]\\]/g, "\\\\$&"), "giu");
+    const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach((node) => {
+      pattern.lastIndex = 0;
+      if (!pattern.test(node.nodeValue)) return;
+      pattern.lastIndex = 0;
+      const fragment = document.createDocumentFragment();
+      let last = 0;
+      node.nodeValue.replace(pattern, (match, offset) => { fragment.append(node.nodeValue.slice(last, offset)); const mark = document.createElement("mark"); mark.className = "search-keyword"; mark.textContent = match; fragment.append(mark); last = offset + match.length; return match; });
+      fragment.append(node.nodeValue.slice(last));
+      node.replaceWith(fragment);
+    });
+    searchHighlightTimer = setTimeout(() => {
+      target.classList.remove("search-target");
+      target.querySelectorAll(".search-keyword").forEach((element) => element.replaceWith(document.createTextNode(element.textContent)));
+    }, 3000);
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   documentsRoot.addEventListener("click", (event) => {
@@ -119,14 +152,7 @@
     if (!button) return;
     renderDocument(data.documents.find((document) => document.id === button.dataset.resultDocument));
     const target = document.getElementById(button.dataset.resultSection);
-    if (target) {
-      target.classList.remove("search-highlight");
-      void target.offsetWidth;
-      target.classList.add("search-highlight");
-      clearTimeout(searchHighlightTimer);
-      searchHighlightTimer = setTimeout(() => target.classList.remove("search-highlight"), 3000);
-      target.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+    if (target) highlightSearchTarget(target, Number(button.dataset.resultParagraph), button.dataset.resultQuery);
     search.value = "";
     results.hidden = true;
   });
