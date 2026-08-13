@@ -14,6 +14,7 @@
   const tocToggle = document.querySelector("#toc-toggle");
   const sidebarBackdrop = document.querySelector("#sidebar-backdrop");
   let current = data.documents[0];
+  let searchHighlightTimer;
   const setTocOpen = (open) => {
     document.body.classList.toggle("toc-open", open);
     tocToggle?.setAttribute("aria-expanded", String(open));
@@ -117,7 +118,15 @@
     const button = event.target.closest("[data-result-document]");
     if (!button) return;
     renderDocument(data.documents.find((document) => document.id === button.dataset.resultDocument));
-    document.getElementById(button.dataset.resultSection)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const target = document.getElementById(button.dataset.resultSection);
+    if (target) {
+      target.classList.remove("search-highlight");
+      void target.offsetWidth;
+      target.classList.add("search-highlight");
+      clearTimeout(searchHighlightTimer);
+      searchHighlightTimer = setTimeout(() => target.classList.remove("search-highlight"), 3000);
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
     search.value = "";
     results.hidden = true;
   });
