@@ -15,11 +15,14 @@
       </a>
       <div class="topbar-actions">
         <button class="toc-toggle" id="toc-toggle" type="button" aria-expanded="false" aria-controls="sidebar">目录</button>
+        <div class="search-wrap">
         <label class="search-box" for="search">
           <span aria-hidden="true">⌕</span>
           <input id="search" type="search" placeholder="搜索规则编号、术语或全文" autocomplete="off" />
           <kbd>Esc</kbd>
         </label>
+        <div class="search-results" id="search-results" hidden aria-live="polite"></div>
+        </div>
         <button class="source-toggle" id="source-toggle" type="button" aria-pressed="false">显示英文原文</button>
       </div>
     </header>
@@ -32,7 +35,6 @@
       <button class="sidebar-backdrop" id="sidebar-backdrop" type="button" aria-label="关闭目录"></button>
 
       <section class="main-column">
-        <div class="search-results" id="search-results" hidden aria-live="polite"></div>
         <section class="cover" aria-labelledby="document-title">
           <div class="cover-copy">
             <p class="eyebrow" id="document-kicker">WFDF 官方规则中文阅读版</p>
