@@ -78,8 +78,12 @@
       const content = section.paragraphs.map(renderParagraph).join("");
       return `<section class="rule-section" id="${section.id}"><h2><span class="section-number">${escape(sectionKey(section))}</span>${titleMarkup(displaySectionTitle(section), "section-title", sectionEnglishTitle(section))}</h2>${diagram}${content}${figure}</section>`;
     }).join("") || '<p class="empty">此文件正在整理为网页结构。请暂时使用上方的 WFDF 原版文档入口。</p>';
-    window.location.hash = "top";
   }
+
+  window.addEventListener("pagehide", () => {
+    const anchor = [...reader.querySelectorAll("[data-search-index], .rule-section")].find((element) => element.getBoundingClientRect().bottom > 76);
+    if (anchor) sessionStorage.setItem("reader-position", JSON.stringify({ document: current.id, section: anchor.closest(".rule-section")?.id, paragraph: anchor.dataset.searchIndex, offset: anchor.getBoundingClientRect().top }));
+  });
 
   function searchContent(query) {
     const needle = query.trim().toLocaleLowerCase();
@@ -192,5 +196,11 @@
   });
   dialog.addEventListener("click", (event) => { if (event.target === dialog || event.target.tagName === "BUTTON") dialog.close(); });
 
-  renderDocument(current);
+  const savedPosition = JSON.parse(sessionStorage.getItem("reader-position") || "null");
+  renderDocument(data.documents.find((document) => document.id === savedPosition?.document) || current);
+  if (savedPosition) requestAnimationFrame(() => {
+    const section = document.getElementById(savedPosition.section);
+    const anchor = savedPosition.paragraph === undefined ? section : section?.querySelector(`[data-search-index="${savedPosition.paragraph}"]`);
+    if (anchor) window.scrollBy({ top: anchor.getBoundingClientRect().top - savedPosition.offset, behavior: "auto" });
+  });
 })();
