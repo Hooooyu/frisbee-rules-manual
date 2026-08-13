@@ -179,9 +179,10 @@
     if (target) highlightSearchTarget(target, Number(button.dataset.resultParagraph), button.dataset.resultQuery);
     results.hidden = true;
   });
+  results.addEventListener("pointerdown", (event) => event.preventDefault());
 
   search.addEventListener("input", () => searchContent(search.value));
-  search.addEventListener("blur", () => setTimeout(() => { searchResultsScrollTop = results.scrollTop; results.hidden = true; }, 0));
+  search.addEventListener("blur", () => { searchResultsScrollTop = results.scrollTop; results.hidden = true; });
   search.addEventListener("focus", () => {
     if (search.value.trim() && results.innerHTML) {
       results.hidden = false;
