@@ -15,6 +15,7 @@
   const sidebarBackdrop = document.querySelector("#sidebar-backdrop");
   let current = data.documents[0];
   let searchHighlightTimer;
+  let searchResultsScrollTop = 0;
   const setTocOpen = (open) => {
     document.body.classList.toggle("toc-open", open);
     tocToggle?.setAttribute("aria-expanded", String(open));
@@ -102,6 +103,7 @@
       });
     }));
     results.hidden = false;
+    results.scrollTop = 0;
     const visible = matches;
     visible.forEach((match) => { match.resultParagraph = match.paragraphIndex; match.resultQuery = needle; });
     results.innerHTML = `<p>${matches.length ? `找到 ${matches.length} 条结果` : "没有找到相关规则"}</p>${visible.map((match) => `<button type="button" data-result-document="${match.document.id}" data-result-section="${match.section.id}"><b>${escape(match.document.label)} · ${escape(sectionName(match.section))}</b><span>${escape(match.paragraph.zh)}</span></button>`).join("")}`;
@@ -113,6 +115,7 @@
     status?.setAttribute("data-result-status", "");
     if (status) status.textContent = `找到 ${matches.length} 条结果 · 当前显示 1-${Math.min(matches.length, 12)} 条`;
     results.onscroll = () => {
+      searchResultsScrollTop = results.scrollTop;
       const items = [...results.querySelectorAll("button[data-result-document]")];
       const top = results.getBoundingClientRect().top;
       const bottom = results.getBoundingClientRect().bottom;
@@ -178,6 +181,13 @@
   });
 
   search.addEventListener("input", () => searchContent(search.value));
+  search.addEventListener("blur", () => { searchResultsScrollTop = results.scrollTop; results.hidden = true; });
+  search.addEventListener("focus", () => {
+    if (search.value.trim() && results.innerHTML) {
+      results.hidden = false;
+      requestAnimationFrame(() => { results.scrollTop = searchResultsScrollTop; });
+    }
+  });
   search.addEventListener("keydown", (event) => { if (event.key === "Escape") { search.value = ""; searchContent(""); search.blur(); } });
   sourceToggle.addEventListener("click", () => {
     const anchor = [...reader.querySelectorAll(".rule-section, p")].find((element) => { const rect = element.getBoundingClientRect(); return rect.bottom > 96 && rect.top < window.innerHeight * 0.45; });
