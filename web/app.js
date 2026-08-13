@@ -98,13 +98,25 @@
       });
     }));
     results.hidden = false;
-    const visible = matches.slice(0, 12);
+    const visible = matches;
     visible.forEach((match) => { match.resultParagraph = match.paragraphIndex; match.resultQuery = needle; });
     results.innerHTML = `<p>${matches.length ? `找到 ${matches.length} 条结果` : "没有找到相关规则"}</p>${visible.map((match) => `<button type="button" data-result-document="${match.document.id}" data-result-section="${match.section.id}"><b>${escape(match.document.label)} · ${escape(sectionName(match.section))}</b><span>${escape(match.paragraph.zh)}</span></button>`).join("")}`;
     results.querySelectorAll("button[data-result-document]").forEach((button, index) => {
       button.dataset.resultParagraph = String(visible[index].resultParagraph);
       button.dataset.resultQuery = visible[index].resultQuery;
     });
+    const status = results.querySelector("p");
+    status?.setAttribute("data-result-status", "");
+    if (status) status.textContent = `找到 ${matches.length} 条结果 · 当前显示 1-${Math.min(matches.length, 12)} 条`;
+    results.onscroll = () => {
+      const items = [...results.querySelectorAll("button[data-result-document]")];
+      const top = results.getBoundingClientRect().top;
+      const bottom = results.getBoundingClientRect().bottom;
+      const first = items.findIndex((item) => item.getBoundingClientRect().bottom > top);
+      const last = items.findLastIndex((item) => item.getBoundingClientRect().top < bottom);
+      const status = results.querySelector("[data-result-status]");
+      if (status && first >= 0) status.textContent = `找到 ${matches.length} 条结果 · 当前显示 ${first + 1}-${Math.max(first + 1, last + 1)} 条`;
+    };
   }
 
   function highlightSearchTarget(section, paragraphIndex, query) {
@@ -158,7 +170,6 @@
     renderDocument(data.documents.find((document) => document.id === button.dataset.resultDocument));
     const target = document.getElementById(button.dataset.resultSection);
     if (target) highlightSearchTarget(target, Number(button.dataset.resultParagraph), button.dataset.resultQuery);
-    search.value = "";
     results.hidden = true;
   });
 
