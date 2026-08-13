@@ -14,6 +14,7 @@
         <span>WFDF</span><small>ULTIMATE RULES</small>
       </a>
       <div class="topbar-actions">
+        <button class="toc-toggle" id="toc-toggle" type="button" aria-expanded="false" aria-controls="sidebar">目录</button>
         <label class="search-box" for="search">
           <span aria-hidden="true">⌕</span>
           <input id="search" type="search" placeholder="搜索规则编号、术语或全文" autocomplete="off" />
@@ -24,10 +25,11 @@
     </header>
 
     <main id="top" class="shell">
-      <aside class="sidebar" aria-label="手册导航">
+      <aside class="sidebar" id="sidebar" aria-label="手册导航">
         <div class="documents" id="documents"></div>
         <nav class="table-of-contents" aria-label="当前文件目录" id="toc"></nav>
       </aside>
+      <button class="sidebar-backdrop" id="sidebar-backdrop" type="button" aria-label="关闭目录"></button>
 
       <section class="main-column">
         <div class="search-results" id="search-results" hidden aria-live="polite"></div>

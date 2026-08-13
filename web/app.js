@@ -11,7 +11,13 @@
   const sourceToggle = document.querySelector("#source-toggle");
   const dialog = document.querySelector("#image-dialog");
   const dialogImage = dialog.querySelector("img");
+  const tocToggle = document.querySelector("#toc-toggle");
+  const sidebarBackdrop = document.querySelector("#sidebar-backdrop");
   let current = data.documents[0];
+  const setTocOpen = (open) => {
+    document.body.classList.toggle("toc-open", open);
+    tocToggle?.setAttribute("aria-expanded", String(open));
+  };
 
   const escape = (value) => String(value).replace(/[&<>"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[character]);
   const annotationEnglishTitles = {
@@ -99,7 +105,13 @@
     const button = event.target.closest("[data-document]");
     if (!button) return;
     renderDocument(data.documents.find((document) => document.id === button.dataset.document));
+    setTocOpen(false);
   });
+
+  toc.addEventListener("click", (event) => { if (event.target.closest("a")) setTocOpen(false); });
+  tocToggle?.addEventListener("click", () => setTocOpen(!document.body.classList.contains("toc-open")));
+  sidebarBackdrop?.addEventListener("click", () => setTocOpen(false));
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") setTocOpen(false); });
 
   results.addEventListener("click", (event) => {
     const button = event.target.closest("[data-result-document]");
