@@ -33,7 +33,6 @@ DOCUMENTS = (
         "subtitle": "2025-2028",
         "effective": "2025 年 1 月 1 日生效",
         "source": "WFDF-Rules-of-Ultimate-2025-2028.pdf",
-        "download": "downloads/WFDF-极限飞盘规则-2025-2028-中文译本.pdf",
         "kind": "rules",
     },
     {
@@ -43,7 +42,6 @@ DOCUMENTS = (
         "subtitle": "Appendix v2.0",
         "effective": "2026 年 1 月 1 日生效",
         "source": "WFDF-Rules-of-Ultimate-2025-2028-Appendix-v2.0.pdf",
-        "download": "downloads/WFDF-极限飞盘规则-附录-v2.0-中文译本.pdf",
         "kind": "appendix",
     },
     {
@@ -53,7 +51,6 @@ DOCUMENTS = (
         "subtitle": "Official Annotations",
         "effective": "2026 年 6 月 1 日生效",
         "source": "WFDF-Rules-of-Ultimate-2025-2028-Official-Annotations.pdf",
-        "download": "downloads/WFDF-极限飞盘规则-官方注释-中文译本.pdf",
         "kind": "annotations",
     },
     {
@@ -63,7 +60,7 @@ DOCUMENTS = (
         "subtitle": "Decision Diagrams",
         "effective": "与 2025-2028 主规则配套阅读",
         "source": "WFDF-Rules-of-Ultimate-2025-2028-Decision-Diagrams.pdf",
-        "download": "downloads/WFDF-极限飞盘规则-判定流程图-中文转写.pdf",
+        "translated_source": "WFDF-极限飞盘规则-判定流程图-中文转写.pdf",
         "kind": "diagram",
         "diagram": "decision",
     },
@@ -74,11 +71,13 @@ DOCUMENTS = (
         "subtitle": "Pull Diagrams",
         "effective": "与 2025-2028 主规则第 7 条配套阅读",
         "source": "WFDF-Rules-of-Ultimate-2025-2028-Pull-Diagrams.pdf",
-        "download": "downloads/WFDF-极限飞盘规则-发盘图-中文转写.pdf",
+        "translated_source": "WFDF-极限飞盘规则-发盘图-中文转写.pdf",
         "kind": "diagram",
         "diagram": "pull",
     },
 )
+
+WEB_DOCUMENT_KEYS = ("id", "label", "title", "subtitle", "effective", "kind")
 
 DIAGRAM_PAGES = {
     "decision": (
@@ -786,7 +785,7 @@ def translate_source_sections(meta: dict, sections: list[dict]) -> dict:
         if meta["id"] == "rules" and section["key"] == "2":
             rendered_section["figure"] = main_rule_figure()
         rendered.append(rendered_section)
-    return {**meta, "original": f"downloads/{meta['source']}", "sections": rendered}
+    return {**{key: meta[key] for key in WEB_DOCUMENT_KEYS}, "sections": rendered}
 
 
 RULE_START = re.compile(r"(?<![\w.])((?:[A-H]?\d+)(?:\.\d+)*\.)\s*")
@@ -903,7 +902,7 @@ def build_document(meta: dict) -> dict:
 
 
 def build_diagram_document(meta: dict) -> dict:
-    translated_pdf = fitz.open(ROOT / "output" / "pdf" / Path(meta["download"]).name)
+    translated_pdf = fitz.open(ROOT / "output" / "pdf" / meta["translated_source"])
     source_pdf = fitz.open(ROOT / meta["source"])
     target = ASSETS / "diagrams"
     target.mkdir(parents=True, exist_ok=True)
@@ -928,23 +927,11 @@ def build_diagram_document(meta: dict) -> dict:
             "alt": f"{meta['title']}{key}：{title}",
             "paragraphs": [],
         })
-    return {**meta, "original": f"downloads/{meta['source']}", "sections": sections}
-
-
-def copy_reading_files() -> None:
-    """Keep the static site self-contained when served from the web directory."""
-    downloads = WEB / "downloads"
-    downloads.mkdir(exist_ok=True)
-    for meta in DOCUMENTS:
-        shutil.copy2(ROOT / meta["source"], downloads / meta["source"])
-        translated = Path(meta["download"]).name
-        shutil.copy2(ROOT / "output" / "pdf" / translated, downloads / translated)
-    shutil.copy2(ROOT / "WFDF-规则核查问题记录.md", WEB / "规则核查问题记录.md")
+    return {**{key: meta[key] for key in WEB_DOCUMENT_KEYS}, "sections": sections}
 
 
 def main() -> None:
     WEB.mkdir(exist_ok=True)
-    copy_reading_files()
     shutil.rmtree(ASSETS / "diagrams", ignore_errors=True)
     raw_sections = {meta["id"]: source_sections(meta) for meta in DOCUMENTS if meta["kind"] != "diagram"}
     translation_sources = {unit for sections in raw_sections.values() for section in sections for unit in section["sourceUnits"]}
