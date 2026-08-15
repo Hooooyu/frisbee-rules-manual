@@ -18,12 +18,25 @@ import fitz
 ROOT = Path(__file__).resolve().parent
 WEB = ROOT / "web"
 ASSETS = WEB / "assets"
-REVIEWED_RULES_PATH = ROOT / "WFDF团队飞盘规则2025-2028_中文校订整合版.md"
-REVIEWED_APPENDIX_PATH = Path(r"C:\Users\HOOOOYU\Downloads\WFDF团队飞盘规则2025-2028_附录v2.0_中文校订整合版.md")
-REVIEWED_ANNOTATIONS_PATH = Path(r"C:\Users\HOOOOYU\Downloads\WFDF团队飞盘规则2025-2028_官方注释_中文校订整合版.md")
+DOCS = ROOT / "docs"
+SOURCE_PDFS = DOCS / "source-pdf"
+REVIEWED_RULES_PATH = DOCS / "WFDF团队飞盘规则2025-2028_中文校订整合版.md"
+REVIEWED_APPENDIX_PATH = DOCS / "WFDF团队飞盘规则2025-2028_附录v2.0_中文校订整合版.md"
+REVIEWED_ANNOTATIONS_PATH = DOCS / "WFDF团队飞盘规则2025-2028_官方注释_中文校订整合版.md"
 TRANSLATION_CACHE_PATH = ROOT / "tmp" / "web-translation-cache.json"
 LEGACY_CACHE_PATH = ROOT / "tmp" / "layout" / "cache.json"
 TRANSLATIONS: dict[str, str] = {}
+
+ANNOTATION_SOURCE_REPAIRS = {
+    "8.5": (("18.2.5", "18.2.6"),),
+    "10.1": (("18.2.4.3", "18.2.5.3"),),
+    "13.13": (("18.2.4.1", "18.2.5.1"),),
+    "18.8": (("18.1.4", "18.1.5"),),
+    "18.10": (("18.2.1.1", "18.2.2.1"),),
+    "18.12": (("18.2.4.3", "18.2.5.3"),),
+    "18.13": (("18.2.4.5", "18.2.5.5"),),
+    "18.14": (("18.2.5", "18.2.6"),),
+}
 
 DOCUMENTS = (
     {
@@ -60,7 +73,7 @@ DOCUMENTS = (
         "subtitle": "Decision Diagrams",
         "effective": "与 2025-2028 主规则配套阅读",
         "source": "WFDF-Rules-of-Ultimate-2025-2028-Decision-Diagrams.pdf",
-        "translated_source": "WFDF-极限飞盘规则-判定流程图-中文转写.pdf",
+        "source_markdown": "WFDF-极限飞盘规则-判定流程图-中文转写.md",
         "kind": "diagram",
         "diagram": "decision",
     },
@@ -71,7 +84,7 @@ DOCUMENTS = (
         "subtitle": "Pull Diagrams",
         "effective": "与 2025-2028 主规则第 7 条配套阅读",
         "source": "WFDF-Rules-of-Ultimate-2025-2028-Pull-Diagrams.pdf",
-        "translated_source": "WFDF-极限飞盘规则-发盘图-中文转写.pdf",
+        "source_markdown": "WFDF-极限飞盘规则-发盘图-中文转写.md",
         "kind": "diagram",
         "diagram": "pull",
     },
@@ -104,7 +117,7 @@ def main_rule_figure() -> dict[str, str]:
     target = ASSETS / "figures"
     target.mkdir(parents=True, exist_ok=True)
     original = target / "rules-field-original.jpg"
-    pdf = fitz.open(ROOT / "WFDF-Rules-of-Ultimate-2025-2028.pdf")
+    pdf = fitz.open(SOURCE_PDFS / "WFDF-Rules-of-Ultimate-2025-2028.pdf")
     image = pdf.extract_image(pdf[2].get_images(full=True)[0][0])
     original.write_bytes(image["image"])
     return {
@@ -379,7 +392,6 @@ def reviewed_appendix_rules() -> tuple[dict[str, str], dict[str, str]]:
     unnumbered: dict[str, list[str]] = {}
     current_section: str | None = None
     last_rule: str | None = None
-    skip_signal_details = False
 
     def plain(text: str) -> str:
         text = text.strip().replace("**", "").replace("`", "")
@@ -391,14 +403,14 @@ def reviewed_appendix_rules() -> tuple[dict[str, str], dict[str, str]]:
             continue
 
         if line == "# 引言":
-            current_section, last_rule, skip_signal_details = "Introduction", None, False
+            current_section, last_rule = "Introduction", None
             titles[current_section] = "引言"
             continue
 
         chapter = re.match(r"^# 附录 ([A-H])：\s*(.+)$", line)
         if chapter:
             letter, title = chapter.groups()
-            current_section, last_rule, skip_signal_details = f"appendix-{letter.lower()}", None, False
+            current_section, last_rule = f"appendix-{letter.lower()}", None
             titles[current_section] = title
             continue
 
@@ -410,11 +422,9 @@ def reviewed_appendix_rules() -> tuple[dict[str, str], dict[str, str]]:
             continue
 
         if line == "## 手势 1–24":
-            skip_signal_details = True
+            current_section = "signals"
+            titles[current_section] = "手势 1–24"
             last_rule = None
-            continue
-
-        if skip_signal_details:
             continue
 
         if line.startswith("#"):
@@ -684,7 +694,7 @@ def is_rule_start(meta: dict, x: float, text: str) -> bool:
 
 
 def source_sections(meta: dict) -> list[dict]:
-    pdf = fitz.open(ROOT / meta["source"])
+    pdf = fitz.open(SOURCE_PDFS / meta["source"])
     sections: list[dict] = []
     current: dict | None = None
     unit: str | None = None
@@ -692,6 +702,9 @@ def source_sections(meta: dict) -> list[dict]:
     def flush() -> None:
         nonlocal unit
         if current is not None and unit:
+            if meta["id"] == "annotations":
+                for old, new in ANNOTATION_SOURCE_REPAIRS.get(annotation_number(unit), ()):
+                    unit = unit.replace(old, new)
             current["sourceUnits"].append(unit.strip())
         unit = None
 
@@ -700,15 +713,18 @@ def source_sections(meta: dict) -> list[dict]:
             # Appendix/annotation first page is cover/contents only. The main
             # rules first page also contains the real Introduction, so retain it.
             continue
+        if meta["kind"] == "appendix" and page_index in {27, 28}:
+            # Appendix F's two signal plates are represented by reviewed Markdown.
+            # Their PDF text layer is column-interleaved and must not pollute F2.3.
+            continue
         for x, y, text in pdf_lines(page):
-            if y < 48 or y > page.rect.height - 42 or text == "Contents" or "................................................................" in text:
+            if y < 48 or y > page.rect.height - 42 or text == str(page_index + 1) or text == "Contents" or "................................................................" in text:
                 continue
             if meta["kind"] == "rules" and page_index == 0 and y < 540:
                 continue
-            if text.startswith("WFDF Rules of Ultimate") or text.startswith("Official Version") or text.startswith("- APPENDIX") or text.startswith("Figure ") or (meta["kind"] == "annotations" and text == "Official Annotations"):
+            if text.startswith("Official Version") or text.startswith("- APPENDIX") or text.startswith("Figure ") or (meta["kind"] == "annotations" and text == "Official Annotations"):
                 continue
             text = re.sub(r"\s+\d+\s+(?=(?:[A-H]?\d+\.\d+\.))", " ", text)
-            text = re.sub(r"\s+\d+\.\s+(?=[A-Z])", " ", text)
             heading = section_heading(meta, x, text)
             if heading:
                 flush()
@@ -779,12 +795,22 @@ def translate_source_sections(meta: dict, sections: list[dict]) -> dict:
                 continue
             number = rule_number(source)
             translated = reviewed[next(reviewed_key_by_source_index) if number else section["key"]] if reviewed else TRANSLATIONS.get(hashlib.sha1(source.encode("utf-8")).hexdigest(), source)
-            reviewed_paragraphs = translated.splitlines() if reviewed and not number else [translated]
+            reviewed_paragraphs = translated.splitlines() if reviewed and (not number or number == "E8.2") else [translated]
             paragraphs.extend({"zh": text, "en": source if index == 0 else "", "page": None} for index, text in enumerate(reviewed_paragraphs))
         rendered_section = {**section, "title": reviewed_titles.get(section["key"], section["title"]), "paragraphs": paragraphs}
         if meta["id"] == "rules" and section["key"] == "2":
             rendered_section["figure"] = main_rule_figure()
         rendered.append(rendered_section)
+        if meta["id"] == "appendix" and section["key"] == "F2" and reviewed.get("signals"):
+            rendered.append({
+                "id": "appendix-signals",
+                "key": "signals",
+                "title": reviewed_titles["signals"],
+                "paragraphs": [
+                    {"zh": text, "en": "", "page": None}
+                    for text in reviewed["signals"].splitlines()
+                ],
+            })
     return {**{key: meta[key] for key in WEB_DOCUMENT_KEYS}, "sections": rendered}
 
 
@@ -902,25 +928,31 @@ def build_document(meta: dict) -> dict:
 
 
 def build_diagram_document(meta: dict) -> dict:
-    translated_pdf = fitz.open(ROOT / "output" / "pdf" / meta["translated_source"])
-    source_pdf = fitz.open(ROOT / meta["source"])
+    markdown_path = DOCS / meta["source_markdown"]
+    image_paths = [
+        (markdown_path.parent / match).resolve()
+        for match in re.findall(r"!\[[^\]]*\]\(([^)]+)\)", markdown_path.read_text(encoding="utf-8"))
+    ]
+    if len(image_paths) != len(DIAGRAM_PAGES[meta["diagram"]]):
+        raise ValueError(f"图示 Markdown 图片数量不匹配：{markdown_path}")
+    source_pdf = fitz.open(SOURCE_PDFS / meta["source"])
     target = ASSETS / "diagrams"
     target.mkdir(parents=True, exist_ok=True)
     sections = []
     for index, (key, title, description) in enumerate(DIAGRAM_PAGES[meta["diagram"]]):
-        zh_page, en_page = translated_pdf[index], source_pdf[index]
+        translated_image = image_paths[index]
+        en_page = source_pdf[index]
         zh_name = f"{meta['id']}-{index + 1}.png"
         en_name = f"{meta['id']}-{index + 1}-original.png"
-        zh_page.get_pixmap(matrix=fitz.Matrix(1.6, 1.6), alpha=False).save(target / zh_name)
+        shutil.copy2(translated_image, target / zh_name)
         en_page.get_pixmap(matrix=fitz.Matrix(1.6, 1.6), alpha=False).save(target / en_name)
-        zh_text = clean_zh(norm(zh_page.get_text()))
         en_text = norm(en_page.get_text())
         sections.append({
             "id": f"{meta['id']}-{index + 1}",
             "key": key,
             "title": title,
             "description": description,
-            "keywords": zh_text,
+            "keywords": "",
             "sourceKeywords": en_text,
             "image": f"assets/diagrams/{zh_name}",
             "sourceImage": f"assets/diagrams/{en_name}",
@@ -934,7 +966,7 @@ def main() -> None:
     WEB.mkdir(exist_ok=True)
     shutil.rmtree(ASSETS / "diagrams", ignore_errors=True)
     raw_sections = {meta["id"]: source_sections(meta) for meta in DOCUMENTS if meta["kind"] != "diagram"}
-    translation_sources = {unit for sections in raw_sections.values() for section in sections for unit in section["sourceUnits"]}
+    translation_sources = set()
     global TRANSLATIONS
     TRANSLATIONS = translate_all(translation_sources)
     data = {
@@ -949,6 +981,23 @@ def main() -> None:
         ],
     }
     payload = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</script", "<\\/script")
+    required = (
+        "积分 =（最高积分 ÷ 组别队伍数量）×〔（组别队伍数量 − 队伍名次）+ 1〕。",
+        "24. Match Point / 赛点",
+        "WFDF Rules of Ultimate is the primary document",
+        "WFDF Rules of Ultimate Appendix to fairly determine the choices",
+        "reaches 4. The second stoppage",
+        "18.8 Marker does not adjust the stall count after a marking infraction (18.1.5)",
+        "18.10 Passing while slowing down after catching the disc (18.2.2.1)",
+        "18.12 Run up for a throw (18.2.5.3)",
+        "18.13 Tipping (18.2.5.5)",
+        "18.14 Continuing play after a Travel call (18.2.6)",
+    )
+    damaged = ("and the 18 pass", "to 30 hear", "and the 34 turnover", "an 24 additional")
+    if missing := [text for text in required if text not in payload]:
+        raise ValueError(f"网页内容缺失：{missing}")
+    if found := [text for text in damaged if text in payload]:
+        raise ValueError(f"英文 PDF 抽取仍有损坏：{found}")
     (WEB / "data.js").write_text(f"window.HANDBOOK_DATA={payload};\n", encoding="utf-8")
     print(f"Wrote {WEB / 'data.js'}: {len(payload):,} characters")
 
