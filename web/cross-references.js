@@ -104,6 +104,7 @@
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
     nodes.forEach((node) => decorateTextNode(node, sourceDocumentId));
+    if (paragraph.querySelector(".rule-reference")) paragraph.classList.add("has-rule-reference");
   };
 
   const dialog = document.createElement("dialog");
