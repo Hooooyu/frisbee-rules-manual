@@ -5,7 +5,6 @@
 
   const referencePattern = /\b([A-H]?\d+(?:\.\d+)+)\b/g;
   const numberedRulePattern = /^((?:[A-H]?\d+)(?:\.\d+)+)\.\s*/;
-  const documentsById = new Map(data.documents.map((document) => [document.id, document]));
   const referencesByNumber = new Map();
 
   const ruleNumber = (text) => (String(text).match(numberedRulePattern) || [])[1] || "";
@@ -63,6 +62,7 @@
     button.dataset.ruleReference = number;
     button.dataset.sourceDocument = sourceDocumentId;
     button.setAttribute("aria-label", `查看规则 ${number}`);
+    button.setAttribute("aria-haspopup", "dialog");
     button.textContent = number;
     return button;
   };
