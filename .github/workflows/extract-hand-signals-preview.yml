@@ -27,6 +27,8 @@ jobs:
           python tools/extract_appendix_hand_signals.py \
             --output tmp/hand-signals/appendix-hand-signals.png \
             --manifest tmp/hand-signals/manifest.json
+          cp docs/source-pdf/WFDF-Rules-of-Ultimate-2025-2028-Appendix-v2.0.pdf \
+            tmp/hand-signals/source-appendix-v2.0.pdf
 
       - name: 上传预览产物
         uses: actions/upload-artifact@v4
