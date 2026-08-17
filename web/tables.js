@@ -120,9 +120,9 @@
   const fixKnownTitles = () => {
     const english = "Seeding Pools (Semi-Random Seeding)";
     const sectionTitle = reader.querySelector("#appendix-e3 .section-title-en");
-    if (sectionTitle) sectionTitle.textContent = english;
+    if (sectionTitle && sectionTitle.textContent !== english) sectionTitle.textContent = english;
     const tocTitle = toc?.querySelector('a[href="#appendix-e3"] .toc-title-en');
-    if (tocTitle) tocTitle.textContent = english;
+    if (tocTitle && tocTitle.textContent !== english) tocTitle.textContent = english;
   };
 
   let scheduled = false;
