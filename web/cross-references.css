@@ -2,7 +2,7 @@
   display: inline;
   margin: 0 .03em;
   padding: 0;
-  color: var(--green-mid);
+  color: inherit;
   background: transparent;
   border: 0;
   border-bottom: 1px dashed currentColor;
