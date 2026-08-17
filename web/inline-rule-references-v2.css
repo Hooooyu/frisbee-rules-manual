@@ -58,17 +58,40 @@
 
 .reference-inline-copy {
   min-width: 0;
+  max-height: min(44vh, 26rem);
+  overflow-y: auto;
+  padding-right: .2rem;
   font-family: var(--serif);
   font-size: .94rem;
   line-height: 1.75;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
-.reference-inline-copy strong {
+.reference-inline-rule {
+  margin: 0;
+  padding-left: calc(var(--reference-depth, 0) * 1.2rem);
+  text-align: left;
+}
+
+.reference-inline-rule + .reference-inline-rule {
+  margin-top: .42rem;
+}
+
+.reference-inline-rule[style*="--reference-depth: 1"] {
+  margin-top: .58rem;
+}
+
+.reference-inline-rule strong {
   color: var(--green);
   font-family: var(--sans);
   font-size: .9em;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
+}
+
+.reference-inline-continuation {
+  color: #505a54;
 }
 
 .reference-inline-jump {
@@ -116,7 +139,12 @@
   }
 
   .reference-inline-copy {
+    max-height: min(42vh, 22rem);
     font-size: .92rem;
     line-height: 1.7;
+  }
+
+  .reference-inline-rule {
+    padding-left: calc(var(--reference-depth, 0) * .8rem);
   }
 }
