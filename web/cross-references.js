@@ -90,8 +90,6 @@
   };
 
   const decorateParagraph = (paragraph) => {
-    if (paragraph.dataset.referencesChecked === "true") return;
-    paragraph.dataset.referencesChecked = "true";
     const sourceDocumentId = currentDocumentId();
     const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
@@ -104,7 +102,7 @@
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
     nodes.forEach((node) => decorateTextNode(node, sourceDocumentId));
-    if (paragraph.querySelector(".rule-reference")) paragraph.classList.add("has-rule-reference");
+    paragraph.classList.toggle("has-rule-reference", Boolean(paragraph.querySelector(".rule-reference")));
   };
 
   const dialog = document.createElement("dialog");
