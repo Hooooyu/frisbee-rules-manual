@@ -11,6 +11,8 @@
   let activeTrigger = null;
 
   const ruleNumber = (text) => (String(text).match(numberedRulePattern) || [])[1] || "";
+  const ruleDepth = (number) => number ? number.split(".").length : 0;
+  const isDescendantRule = (candidate, parent) => Boolean(candidate && parent && candidate.startsWith(`${parent}.`));
 
   data.documents.forEach((document) => {
     document.sections.forEach((section) => {
@@ -18,10 +20,17 @@
         const number = ruleNumber(paragraph.zh);
         if (!number) return;
 
+        // A reference to a parent rule should include its complete subtree. Unnumbered
+        // continuation paragraphs belong to the preceding numbered rule and are kept too.
         const relatedParagraphs = [paragraph];
         for (let index = paragraphIndex + 1; index < paragraphs.length; index += 1) {
-          if (ruleNumber(paragraphs[index].zh)) break;
-          relatedParagraphs.push(paragraphs[index]);
+          const nextParagraph = paragraphs[index];
+          const nextNumber = ruleNumber(nextParagraph.zh);
+          if (!nextNumber || isDescendantRule(nextNumber, number)) {
+            relatedParagraphs.push(nextParagraph);
+            continue;
+          }
+          break;
         }
 
         const entry = { number, document, section, paragraphIndex, paragraphs: relatedParagraphs };
@@ -112,8 +121,6 @@
     activeTrigger = null;
   };
 
-  const previewText = (entry) => entry.paragraphs.map((paragraph) => paragraph.zh.trim()).filter(Boolean).join(" ");
-
   const flashTarget = (target) => {
     reader.querySelectorAll(".reference-target").forEach((element) => element.classList.remove("reference-target"));
     target.classList.add("reference-target");
@@ -130,6 +137,34 @@
       const section = document.getElementById(entry.section.id);
       const target = section?.querySelector(`[data-search-index="${entry.paragraphIndex}"]`) || section;
       if (target) flashTarget(target);
+    });
+  };
+
+  const appendPreviewParagraphs = (container, entry) => {
+    const rootDepth = ruleDepth(entry.number);
+    let lastRelativeDepth = 0;
+
+    entry.paragraphs.forEach((paragraph) => {
+      const rawText = String(paragraph.zh || "").trim();
+      if (!rawText) return;
+
+      const number = ruleNumber(rawText);
+      const line = document.createElement("p");
+      line.className = "reference-inline-rule";
+
+      if (number) {
+        lastRelativeDepth = Math.max(0, ruleDepth(number) - rootDepth);
+        const numberElement = document.createElement("strong");
+        numberElement.textContent = `${number}.`;
+        const body = rawText.replace(numberedRulePattern, "").trim();
+        line.append(numberElement, document.createTextNode(body ? ` ${body}` : ""));
+      } else {
+        line.classList.add("reference-inline-continuation");
+        line.textContent = rawText;
+      }
+
+      line.style.setProperty("--reference-depth", String(Math.min(lastRelativeDepth, 4)));
+      container.append(line);
     });
   };
 
@@ -150,10 +185,7 @@
 
     const copy = document.createElement("div");
     copy.className = "reference-inline-copy";
-    const number = document.createElement("strong");
-    number.textContent = `${entry.number}.`;
-    const text = previewText(entry).replace(numberedRulePattern, "").trim();
-    copy.append(number, document.createTextNode(` ${text}`));
+    appendPreviewParagraphs(copy, entry);
 
     const jump = document.createElement("button");
     jump.type = "button";
