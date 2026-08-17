@@ -1,0 +1,36 @@
+name: 验证附录手势图提取
+
+on:
+  push:
+    branches: [agent/add-hand-signal-images]
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 获取代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装提取依赖
+        run: python -m pip install --disable-pip-version-check pymupdf pillow
+
+      - name: 从 Appendix v2.0 提取手势图
+        run: |
+          python tools/extract_appendix_hand_signals.py \
+            --output tmp/hand-signals/appendix-hand-signals.png \
+            --manifest tmp/hand-signals/manifest.json
+
+      - name: 上传预览产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: appendix-hand-signals-preview
+          path: tmp/hand-signals/
+          if-no-files-found: error
