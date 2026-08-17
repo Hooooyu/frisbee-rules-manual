@@ -1,0 +1,74 @@
+#appendix-signals .hand-signal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+#appendix-signals .hand-signal-card {
+  display: grid !important;
+  grid-template-rows: 190px auto;
+  gap: .8rem;
+  min-width: 0;
+  margin: 0 !important;
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: var(--sans);
+  text-align: left !important;
+}
+
+#appendix-signals .hand-signal-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  padding: .35rem;
+  background: #fff;
+  border: 0;
+  cursor: zoom-in;
+}
+
+#appendix-signals .hand-signal-image {
+  display: block;
+  width: 100%;
+  height: 180px;
+  object-fit: contain;
+}
+
+#appendix-signals .hand-signal-copy {
+  display: block;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: .84rem;
+  line-height: 1.65;
+}
+
+.reader.show-source #appendix-signals .hand-signal-card::after {
+  margin-top: .1rem;
+  padding-top: .7rem;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 620px) {
+  #appendix-signals .hand-signal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .7rem;
+  }
+
+  #appendix-signals .hand-signal-card {
+    grid-template-rows: 145px auto;
+    padding: .7rem;
+  }
+
+  #appendix-signals .hand-signal-image {
+    height: 135px;
+  }
+
+  #appendix-signals .hand-signal-copy {
+    font-size: .76rem;
+    line-height: 1.55;
+  }
+}
