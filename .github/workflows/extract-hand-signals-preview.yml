@@ -1,28 +1,42 @@
-name: 验证附录手势图提取
+name: 提取附录手势图
 
 on:
   push:
     branches: [agent/add-hand-signal-images]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   extract:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: 获取代码
         uses: actions/checkout@v4
 
-      - name: 准备 Appendix v2.0 源文件
-        run: |
-          mkdir -p tmp/hand-signals
-          cp docs/source-pdf/WFDF-Rules-of-Ultimate-2025-2028-Appendix-v2.0.pdf \
-            tmp/hand-signals/source-appendix-v2.0.pdf
-
-      - name: 上传源文件用于精确提取验证
-        uses: actions/upload-artifact@v4
+      - name: 配置 Python
+        uses: actions/setup-python@v5
         with:
-          name: appendix-hand-signals-source
-          path: tmp/hand-signals/source-appendix-v2.0.pdf
-          if-no-files-found: error
+          python-version: "3.12"
+
+      - name: 安装提取依赖
+        run: python -m pip install --disable-pip-version-check pymupdf
+
+      - name: 从 Appendix v2.0 提取 24 张手势图
+        run: |
+          python tools/extract_appendix_hand_signals.py \
+            --manifest /tmp/hand-signals-manifest.json
+          cat /tmp/hand-signals-manifest.json
+
+      - name: 提交提取出的网页图片资产
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/assets/figures/hand-signals/
+          if git diff --cached --quiet; then
+            echo "No extracted image changes to commit."
+          else
+            git commit -m "add extracted hand-signal assets"
+            git push
+          fi
