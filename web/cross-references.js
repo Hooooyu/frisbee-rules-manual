@@ -6,6 +6,9 @@
   const referencePattern = /\b([A-H]?\d+(?:\.\d+)+)\b/g;
   const numberedRulePattern = /^((?:[A-H]?\d+)(?:\.\d+)+)\.\s*/;
   const referencesByNumber = new Map();
+  let previewSequence = 0;
+  let activePreview = null;
+  let activeTrigger = null;
 
   const ruleNumber = (text) => (String(text).match(numberedRulePattern) || [])[1] || "";
 
@@ -34,7 +37,7 @@
     });
   });
 
-  const currentDocumentId = () => document.querySelector(".document-button[aria-current=\"page\"]")?.dataset.document || data.documents[0]?.id || "rules";
+  const currentDocumentId = () => document.querySelector('.document-button[aria-current="page"]')?.dataset.document || data.documents[0]?.id || "rules";
 
   const referencePriority = (sourceDocumentId, number) => {
     if (/^[A-H]/.test(number)) return ["appendix", sourceDocumentId, "rules", "annotations"];
@@ -61,8 +64,8 @@
     button.className = "rule-reference";
     button.dataset.ruleReference = number;
     button.dataset.sourceDocument = sourceDocumentId;
-    button.setAttribute("aria-label", `查看规则 ${number}`);
-    button.setAttribute("aria-haspopup", "dialog");
+    button.setAttribute("aria-label", `展开规则 ${number}`);
+    button.setAttribute("aria-expanded", "false");
     button.textContent = number;
     return button;
   };
@@ -105,84 +108,20 @@
     paragraph.classList.toggle("has-rule-reference", Boolean(paragraph.querySelector(".rule-reference")));
   };
 
-  const dialog = document.createElement("dialog");
-  dialog.className = "reference-dialog";
-  dialog.setAttribute("aria-labelledby", "reference-dialog-title");
-  dialog.innerHTML = `
-    <article class="reference-card">
-      <header class="reference-dialog-header">
-        <div>
-          <p class="reference-kicker">引用条款</p>
-          <h3 id="reference-dialog-title"></h3>
-        </div>
-        <button class="reference-icon-close" type="button" aria-label="关闭引用条款">×</button>
-      </header>
-      <div class="reference-dialog-body">
-        <p class="reference-meta"></p>
-        <div class="reference-copy"></div>
-        <details class="reference-source">
-          <summary>查看英文原文</summary>
-          <div class="reference-source-copy" lang="en"></div>
-        </details>
-      </div>
-      <footer class="reference-dialog-actions">
-        <button class="reference-jump" type="button">定位到原条款</button>
-        <button class="reference-close" type="button">关闭</button>
-      </footer>
-    </article>`;
-  document.body.append(dialog);
-
-  const dialogTitle = dialog.querySelector("#reference-dialog-title");
-  const dialogMeta = dialog.querySelector(".reference-meta");
-  const dialogCopy = dialog.querySelector(".reference-copy");
-  const sourceDetails = dialog.querySelector(".reference-source");
-  const sourceCopy = dialog.querySelector(".reference-source-copy");
-  const jumpButton = dialog.querySelector(".reference-jump");
-  let activeEntry = null;
-  let opener = null;
-
-  const paragraphMarkup = (text, isFirst) => {
-    const paragraph = document.createElement("p");
-    if (isFirst) {
-      const match = String(text).match(numberedRulePattern);
-      if (match) {
-        const number = document.createElement("span");
-        number.className = "reference-rule-number";
-        number.textContent = `${match[1]}.`;
-        paragraph.append(number, document.createTextNode(` ${String(text).slice(match[0].length)}`));
-        return paragraph;
-      }
+  const closeActivePreview = () => {
+    activePreview?.remove();
+    if (activeTrigger?.isConnected) {
+      activeTrigger.setAttribute("aria-expanded", "false");
+      activeTrigger.removeAttribute("aria-controls");
     }
-    paragraph.textContent = text;
-    return paragraph;
+    activePreview = null;
+    activeTrigger = null;
   };
 
-  const openReference = (entry, trigger) => {
-    activeEntry = entry;
-    opener = trigger;
-    dialogTitle.textContent = `规则 ${entry.number}`;
-    const sectionLabel = [entry.section.key, entry.section.title].filter(Boolean).join(" ");
-    dialogMeta.textContent = `${entry.document.label}${sectionLabel ? ` · ${sectionLabel}` : ""}`;
-    dialogCopy.replaceChildren(...entry.paragraphs.map((paragraph, index) => paragraphMarkup(paragraph.zh, index === 0)));
-
-    const english = entry.paragraphs.map((paragraph) => paragraph.en).filter(Boolean);
-    sourceDetails.hidden = english.length === 0;
-    sourceDetails.open = reader.classList.contains("show-source") && english.length > 0;
-    sourceCopy.replaceChildren(...english.map((text) => {
-      const paragraph = document.createElement("p");
-      paragraph.textContent = text;
-      return paragraph;
-    }));
-
-    if (typeof dialog.showModal === "function") dialog.showModal();
-    else dialog.setAttribute("open", "");
-    dialog.querySelector(".reference-icon-close")?.focus();
-  };
-
-  const closeDialog = () => {
-    if (typeof dialog.close === "function" && dialog.open) dialog.close();
-    else dialog.removeAttribute("open");
-  };
+  const previewText = (entry) => entry.paragraphs
+    .map((paragraph) => paragraph.zh.trim())
+    .filter(Boolean)
+    .join(" ");
 
   const flashTarget = (target) => {
     reader.querySelectorAll(".reference-target").forEach((element) => element.classList.remove("reference-target"));
@@ -191,11 +130,8 @@
     window.setTimeout(() => target.classList.remove("reference-target"), 2600);
   };
 
-  const jumpToReference = () => {
-    if (!activeEntry) return;
-    const entry = activeEntry;
-    closeDialog();
-
+  const jumpToReference = (entry) => {
+    closeActivePreview();
     const documentButton = document.querySelector(`[data-document="${entry.document.id}"]`);
     if (documentButton && documentButton.getAttribute("aria-current") !== "page") documentButton.click();
 
@@ -206,20 +142,63 @@
     });
   };
 
+  const createInlinePreview = (entry, sourceParagraph) => {
+    const preview = document.createElement("aside");
+    preview.id = `rule-reference-preview-${++previewSequence}`;
+    preview.className = "reference-inline";
+    ["level-3", "level-4", "level-5"].forEach((level) => {
+      if (sourceParagraph.classList.contains(level)) preview.classList.add(level);
+    });
+    preview.setAttribute("role", "note");
+    preview.setAttribute("aria-label", `规则 ${entry.number} 引用内容`);
+
+    const marker = document.createElement("span");
+    marker.className = "reference-inline-marker";
+    marker.setAttribute("aria-hidden", "true");
+    marker.textContent = "↳";
+
+    const copy = document.createElement("div");
+    copy.className = "reference-inline-copy";
+    const number = document.createElement("strong");
+    number.textContent = `${entry.number}.`;
+    const text = previewText(entry).replace(numberedRulePattern, "").trim();
+    copy.append(number, document.createTextNode(` ${text}`));
+
+    const jump = document.createElement("button");
+    jump.type = "button";
+    jump.className = "reference-inline-jump";
+    jump.textContent = "定位原条款";
+    jump.setAttribute("aria-label", `定位到规则 ${entry.number}`);
+    jump.addEventListener("click", () => jumpToReference(entry));
+
+    preview.append(marker, copy, jump);
+    return preview;
+  };
+
+  const toggleReference = (trigger) => {
+    if (trigger === activeTrigger) {
+      closeActivePreview();
+      return;
+    }
+
+    const entry = resolveReference(trigger.dataset.ruleReference, trigger.dataset.sourceDocument || currentDocumentId());
+    if (!entry) return;
+    const sourceParagraph = trigger.closest("p[data-search-index]");
+    if (!sourceParagraph) return;
+
+    closeActivePreview();
+    const preview = createInlinePreview(entry, sourceParagraph);
+    sourceParagraph.insertAdjacentElement("afterend", preview);
+    trigger.setAttribute("aria-expanded", "true");
+    trigger.setAttribute("aria-controls", preview.id);
+    activePreview = preview;
+    activeTrigger = trigger;
+  };
+
   reader.addEventListener("click", (event) => {
     const trigger = event.target.closest(".rule-reference");
     if (!trigger) return;
-    const entry = resolveReference(trigger.dataset.ruleReference, trigger.dataset.sourceDocument || currentDocumentId());
-    if (entry) openReference(entry, trigger);
-  });
-
-  dialog.querySelector(".reference-icon-close").addEventListener("click", closeDialog);
-  dialog.querySelector(".reference-close").addEventListener("click", closeDialog);
-  jumpButton.addEventListener("click", jumpToReference);
-  dialog.addEventListener("click", (event) => { if (event.target === dialog) closeDialog(); });
-  dialog.addEventListener("close", () => {
-    opener?.focus({ preventScroll: true });
-    opener = null;
+    toggleReference(trigger);
   });
 
   let scheduled = false;
@@ -228,6 +207,7 @@
     scheduled = true;
     requestAnimationFrame(() => {
       scheduled = false;
+      if (activePreview && !activePreview.isConnected) closeActivePreview();
       reader.querySelectorAll("p[data-search-index]").forEach(decorateParagraph);
     });
   };
