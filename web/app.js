@@ -193,6 +193,23 @@
   window.addEventListener("resize", updateCompactButtons);
   updateCompactButtons();
 
+  const readingViewportTop = () => Math.max(0, topbar?.getBoundingClientRect().bottom || 0) + 12;
+  const captureReadingPosition = () => {
+    const viewportTop = readingViewportTop();
+    const anchors = [...reader.querySelectorAll(".rule-section > h2, .rule-section > p, .rule-section > .diagram-reader, .rule-section > .rule-figure")];
+    const element = anchors.find((candidate) => {
+      const rect = candidate.getBoundingClientRect();
+      return rect.bottom > viewportTop + 1 && rect.top < window.innerHeight;
+    });
+    if (!element) return null;
+    return { element, offset: element.getBoundingClientRect().top - viewportTop };
+  };
+  const restoreReadingPosition = (position) => {
+    if (!position?.element?.isConnected) return;
+    const delta = position.element.getBoundingClientRect().top - readingViewportTop() - position.offset;
+    if (Math.abs(delta) > 0.5) window.scrollBy({ top: delta, behavior: "auto" });
+  };
+
   results.addEventListener("click", (event) => {
     const button = event.target.closest("[data-result-document]");
     if (!button) return;
@@ -213,12 +230,14 @@
   });
   search.addEventListener("keydown", (event) => { if (event.key === "Escape") { search.value = ""; searchContent(""); search.blur(); } });
   sourceToggle.addEventListener("click", () => {
-    const anchor = [...reader.querySelectorAll(".rule-section, p")].find((element) => { const rect = element.getBoundingClientRect(); return rect.bottom > 96 && rect.top < window.innerHeight * 0.45; });
-    const offset = anchor?.getBoundingClientRect().top || 0;
+    const readingPosition = captureReadingPosition();
     const enabled = reader.classList.toggle("show-source");
     sourceToggle.setAttribute("aria-pressed", String(enabled));
     sourceToggleLabel.textContent = enabled ? (current.kind === "diagram" ? "隐藏英文原图" : "隐藏英文原文") : (current.kind === "diagram" ? "显示英文原图" : "显示英文原文");
-    if (anchor) requestAnimationFrame(() => window.scrollBy({ top: anchor.getBoundingClientRect().top - offset, behavior: "auto" }));
+    if (readingPosition) requestAnimationFrame(() => {
+      restoreReadingPosition(readingPosition);
+      requestAnimationFrame(() => restoreReadingPosition(readingPosition));
+    });
   });
   reader.addEventListener("click", (event) => {
     const button = event.target.closest("[data-image]");
