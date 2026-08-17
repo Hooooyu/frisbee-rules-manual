@@ -20,6 +20,15 @@
   outline: none;
 }
 
+.reader.show-source p.has-rule-reference {
+  display: block;
+}
+
+.reader.show-source p.has-rule-reference::after {
+  display: block;
+  margin-top: .6rem;
+}
+
 .reference-target {
   border-radius: 4px;
   background: rgb(217 239 114 / .35);
