@@ -38,11 +38,17 @@ jobs:
       - name: 验证官方注释已同步
         shell: bash
         run: |
-          grep -Fq '"title":"修订公告"' web/data.js
-          grep -Fq '本项目为非官方中文阅读版' web/data.js
+          grep -Fq '"title":"关于英文《Official Annotations》中规则引用编号的校订说明"' web/data.js
+          grep -Fq '部分中文注释中的规则编号会有意与英文 Official Annotations PDF 不同' web/data.js
+          grep -Fq '下表完整记录目前确认的 23 处编号差异' web/data.js
+          grep -Fq '| 23 | 18.15「走步违例后的比赛恢复」标题 | 18.2.7 | 18.2.6 | 待校正 |' web/data.js
           grep -Fq '"title":"飞盘精神"' web/data.js
           grep -Fq '"title":"验盘（Check）"' web/data.js
           grep -Fq '"title":"攻防转换"' web/data.js
+          if grep -Fq '"title":"修订公告"' web/data.js; then
+            echo '网页仍在显示被替换的通用修订公告'
+            exit 1
+          fi
           if grep -Fq '"title":"目录"' web/data.js; then
             echo '网页正文错误地重复渲染了目录'
             exit 1
