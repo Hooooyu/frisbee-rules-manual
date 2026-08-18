@@ -1,0 +1,44 @@
+name: 验证 Pages 部署内容
+
+on:
+  workflow_run:
+    workflows: ["部署 GitHub Pages"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 获取 main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: 验证线上网页包含最新校订内容
+        shell: bash
+        run: |
+          curl -fsSL --retry 6 --retry-delay 5 \
+            https://hooooyu.github.io/frisbee-rules-manual/data.js \
+            -o /tmp/live-data.js
+          grep -Fq '"title":"修订公告"' /tmp/live-data.js
+          grep -Fq '"title":"目录"' /tmp/live-data.js
+          grep -Fq '本项目为非官方中文阅读版' /tmp/live-data.js
+          grep -Fq '"title":"飞盘精神"' /tmp/live-data.js
+          grep -Fq '"title":"验盘（Check）"' /tmp/live-data.js
+          grep -Fq '"title":"攻防转换"' /tmp/live-data.js
+
+      - name: 记录一次性验证结果
+        shell: bash
+        env:
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          printf 'verified=%s\ndeploy_sha=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$DEPLOY_SHA" > .github/pages-deploy-verified.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/pages-deploy-verified.txt
+          git commit -m "Record verified Pages deployment"
+          git push origin HEAD:main
