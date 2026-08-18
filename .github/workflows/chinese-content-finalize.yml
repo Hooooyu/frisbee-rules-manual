@@ -18,194 +18,108 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 校正中文版并补充官方注释前置内容
+      - name: 校正官方注释并补充修订公告与目录
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
-          import json
           import re
 
-          root = Path('.')
-          annotations_path = root / 'docs' / 'WFDF团队飞盘规则2025-2028_官方注释_中文校订整合版.md'
-          appendix_path = root / 'docs' / 'WFDF团队飞盘规则2025-2028_附录v2.0_中文校订整合版.md'
-          rules_path = root / 'docs' / 'WFDF团队飞盘规则2025-2028_中文校订整合版.md'
-          builder_path = root / 'build_web_handbook.py'
-          data_path = root / 'web' / 'data.js'
+          path = Path('docs/WFDF团队飞盘规则2025-2028_官方注释_中文校订整合版.md')
+          text = path.read_text(encoding='utf-8')
 
           canonical = {
-              'Introduction': '引言',
-              '1': '飞盘精神',
-              '2': '比赛场地',
-              '3': '装备',
-              '4': '回合、得分与比赛',
-              '5': '队伍',
-              '6': '比赛开始',
-              '7': '开盘',
-              '8': '比赛状态',
-              '9': '读秒',
-              '10': '验盘（Check）',
-              '11': '出界',
-              '12': '接盘队员与位置',
-              '13': '攻防转换',
-              '14': '得分',
-              '15': '犯规、违规和违例的示意',
-              '16': '示意后的比赛继续',
-              '17': '犯规',
-              '18': '违规和违例',
-              '19': '安全中断',
-              '20': '暂停',
-              'Definitions': '定义',
-              'Legal License': '法律许可',
+              1: '飞盘精神',
+              2: '比赛场地',
+              3: '装备',
+              4: '回合、得分与比赛',
+              5: '队伍',
+              6: '比赛开始',
+              7: '开盘',
+              8: '比赛状态',
+              9: '读秒',
+              10: '验盘（Check）',
+              11: '出界',
+              12: '接盘队员与位置',
+              13: '攻防转换',
+              14: '得分',
+              15: '犯规、违规和违例的示意',
+              16: '示意后的比赛继续',
+              17: '犯规',
+              18: '违规和违例',
+              19: '安全中断',
+              20: '暂停',
           }
 
-          # 1) Official Annotations: normalize chapter terminology to the main rules.
-          annotations = annotations_path.read_text(encoding='utf-8')
-          if '# 修订公告' in annotations or '# 目录' in annotations:
-              raise SystemExit('Official Annotations already contains a revision notice or TOC; refusing to duplicate it')
+          if '# 修订公告' in text or '# 目录' in text:
+              raise SystemExit('修订公告或目录已经存在，停止以避免重复插入')
 
-          for number in map(str, range(1, 21)):
-              pattern = rf'^# {number}\.\s*.*$'
-              replacement = f'# {number}. {canonical[number]}'
-              annotations, count = re.subn(pattern, replacement, annotations, count=1, flags=re.M)
+          for number, title in canonical.items():
+              text, count = re.subn(
+                  rf'^# {number}\.\s*.*$',
+                  f'# {number}. {title}',
+                  text,
+                  count=1,
+                  flags=re.M,
+              )
               if count != 1:
-                  raise SystemExit(f'Expected exactly one chapter heading for {number}, found {count}')
+                  raise SystemExit(f'第 {number} 章标题数量异常：{count}')
 
-          # 2) Add the requested revision notice and chapter-level TOC before Introduction.
           notice = '''# 修订公告
 
 > 本项目为非官方中文阅读版。正式比赛请以赛事公布的适用版本、WFDF 英文原版及现场裁量为准。
 >
 > 本次修订对中文版内容进行了逐条校正与术语统一；修订仅用于提升中文译文的准确性、一致性与可读性，不构成 WFDF 官方中文版本。如中文表述与 WFDF 英文原文存在歧义或冲突，以 WFDF 英文原文为准。'''
 
-          toc_lines = ['引言', '原则'] + [f'{number}. {canonical[str(number)]}' for number in range(1, 21)]
+          toc_lines = ['引言', '原则'] + [f'{number}. {canonical[number]}' for number in range(1, 21)]
           toc = '# 目录\n\n' + '  \n'.join(toc_lines)
-          marker = '# 引言'
-          if annotations.count(marker) != 1:
-              raise SystemExit(f'Expected one Introduction marker, found {annotations.count(marker)}')
-          before, after = annotations.split(marker, 1)
-          annotations = before.rstrip() + '\n\n' + notice + '\n\n' + toc + '\n\n' + marker + after
-          annotations_path.write_text(annotations, encoding='utf-8')
 
-          # 3) Keep builder chapter labels aligned so future rebuilds do not reintroduce old terminology.
-          builder = builder_path.read_text(encoding='utf-8')
-          for key, title in canonical.items():
-              pattern = rf'(^    "{re.escape(key)}": )"[^"]*"(,)$'
-              builder, count = re.subn(pattern, rf'\1"{title}"\2', builder, count=1, flags=re.M)
-              if count != 1:
-                  raise SystemExit(f'Could not update MAIN_TITLES entry {key}')
+          if text.count('# 引言') != 1:
+              raise SystemExit('引言标题数量异常')
+          before, after = text.split('# 引言', 1)
+          text = before.rstrip() + '\n\n' + notice + '\n\n' + toc + '\n\n# 引言' + after
 
-          glossary_replacements = {
-              '("Spirit of the Game", "比赛精神")': '("Spirit of the Game", "飞盘精神")',
-              '("spirit captain", "比赛精神队长")': '("spirit captain", "飞盘精神队长")',
-              '("central zone", "中区")': '("central zone", "中心区")',
-              '("offensive players?", "进攻队员")': '("offensive players?", "进攻方队员")',
-              '("defensive players?", "防守队员")': '("defensive players?", "防守方队员")',
-              '("stall counts?", "stall 计数")': '("stall counts?", "读秒")',
-              '("pivot points?", "枢轴点")': '("pivot points?", "轴心点")',
-              '("pivot locations?", "枢轴位置")': '("pivot locations?", "轴心位置")',
-              '("turnovers?", "攻守转换")': '("turnovers?", "攻防转换")',
-              '("receivers?", "接盘者")': '("receivers?", "接盘队员")',
-              '("throwers?", "持盘者")': '("throwers?", "持盘队员")',
-              '("infractions?", "违例")': '("infractions?", "违规")',
-              '("violations?", "违规")': '("violations?", "违例")',
-              '("checks?", "检查")': '("checks?", "验盘")',
-              '("calls?", "呼叫")': '("calls?", "示意")',
-              '("pulls?", "发盘")': '("pulls?", "开盘")',
-          }
-          for old, new in glossary_replacements.items():
-              if old in builder:
-                  builder = builder.replace(old, new)
-          builder_path.write_text(builder, encoding='utf-8')
-
-          # 4) Update current web-data chapter labels for Official Annotations without rebuilding PDFs.
-          raw = data_path.read_text(encoding='utf-8')
-          prefix = 'window.HANDBOOK_DATA='
-          if not raw.startswith(prefix):
-              raise SystemExit('Unexpected web/data.js prefix')
-          payload = json.loads(raw[len(prefix):].rstrip().removesuffix(';'))
-          annotation_docs = [doc for doc in payload['documents'] if doc.get('id') == 'annotations']
-          if len(annotation_docs) != 1:
-              raise SystemExit(f'Expected one annotations web document, found {len(annotation_docs)}')
-          web_titles = {'Introduction': '引言（Introduction）', 'Principles': '原则（Principles）'} | {str(i): canonical[str(i)] for i in range(1, 21)}
-          seen = set()
-          for section in annotation_docs[0]['sections']:
-              key = section.get('key')
-              if key in web_titles:
-                  section['title'] = web_titles[key]
-                  seen.add(key)
-          missing = set(web_titles) - seen
-          if missing:
-              raise SystemExit(f'Missing annotation web sections: {sorted(missing)}')
-          data_path.write_text(prefix + json.dumps(payload, ensure_ascii=False, separators=(',', ':')) + ';\n', encoding='utf-8')
-
-          # 5) Regression checks for previously confirmed corrections. Do not touch known upstream numbering conflicts.
-          rules = rules_path.read_text(encoding='utf-8')
-          appendix = appendix_path.read_text(encoding='utf-8')
-          annotations = annotations_path.read_text(encoding='utf-8')
-
-          required_rules = [
-              '如果发生对规则或飞盘精神的故意违背或性质严重的违背',
-              '只要双方涉及该事件的队员都同意',
-              '故意颠盘、失手后重新控制飞盘',
-              '**20.3.4.** 其他所有进攻方队员必须',
-              '**20.3.5.** 当进攻方队员确定各自位置后，防守方队员必须',
-          ]
-          required_appendix = [
-              '**A5.11.** 如果使用一连串哨声表示时间限制，则只有在最后一声哨音开始响起时',
-              '**B5.1.3.** 如果比赛在一次得分完成后、随后的开盘之前暂停',
-              '按照规则 20.3 所规定的暂停后恢复程序重新开始',
-              '场地线判定',
-              '临时纪律执行人员（Acting Disciplinary Authorities）',
-              '**E6.3.** 未通过 E6.1 或 E6.2 获得名额的国家协会',
-              '积分 =（最高积分 ÷ 组别队伍数量）×〔（组别队伍数量 − 队伍名次）+ 1〕。',
-              '## 手势 1–24',
-          ]
-          required_annotations = [
+          required = [
               '# 修订公告',
               '# 目录',
               '# 1. 飞盘精神',
+              '# 7. 开盘',
               '# 9. 读秒',
               '# 10. 验盘（Check）',
+              '# 12. 接盘队员与位置',
+              '# 13. 攻防转换',
               '# 15. 犯规、违规和违例的示意',
+              '# 16. 示意后的比赛继续',
+              '# 18. 违规和违例',
               '# 19. 安全中断',
               '显著的严重伤害风险',
               '## 18.13. 拍盘（Tipping）（18.2.5.5）',
+              '9.5.5',
+              '9.5.5.1',
+              '9.5.5.2',
           ]
-          for label, text, required in [
-              ('rules', rules, required_rules),
-              ('appendix', appendix, required_appendix),
-              ('annotations', annotations, required_annotations),
-          ]:
-              absent = [item for item in required if item not in text]
-              if absent:
-                  raise SystemExit(f'{label} regression check failed: {absent}')
+          missing = [item for item in required if item not in text]
+          if missing:
+              raise SystemExit(f'校正回归检查失败：{missing}')
 
-          if not (annotations.index('# 修订公告') < annotations.index('# 目录') < annotations.index('# 引言')):
-              raise SystemExit('Revision notice / TOC / Introduction order is incorrect')
+          if not (text.index('# 修订公告') < text.index('# 目录') < text.index('# 引言')):
+              raise SystemExit('修订公告、目录、引言顺序错误')
 
-          # Preserve the explicitly documented WFDF upstream conflicts.
-          for token in ['9.5.5', '9.5.5.1', '9.5.5.2']:
-              if token not in annotations:
-                  raise SystemExit(f'Upstream conflict reference unexpectedly disappeared: {token}')
-
-          print('Chinese content finalization checks passed.')
+          path.write_text(text, encoding='utf-8')
+          print('官方注释中文版校正完成。')
           PY
 
       - name: 检查并提交
         shell: bash
         run: |
           git diff --check
-          git status --short
+          git diff -- docs/WFDF团队飞盘规则2025-2028_官方注释_中文校订整合版.md
           if git diff --quiet; then
             echo "没有需要提交的变更"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            docs/WFDF团队飞盘规则2025-2028_官方注释_中文校订整合版.md \
-            build_web_handbook.py \
-            web/data.js
-          git commit -m "Finalize Chinese rules wording and annotations front matter"
+          git add docs/WFDF团队飞盘规则2025-2028_官方注释_中文校订整合版.md
+          git commit -m "Finalize Chinese annotations wording and front matter"
           git push origin HEAD:main
