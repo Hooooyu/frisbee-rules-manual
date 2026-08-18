@@ -57,7 +57,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
-          gh api --method DELETE "repos/$REPO/git/refs/heads/docs/update-reviewed-build-command" >/dev/null 2>&1 || true
+          for branch in docs/update-reviewed-build-command chore/remove-one-time-deploy; do
+            gh api --method DELETE "repos/$REPO/git/refs/heads/$branch" >/dev/null 2>&1 || true
+          done
 
       - name: 提交部署状态
         shell: bash
