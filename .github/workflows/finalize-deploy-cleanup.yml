@@ -1,0 +1,171 @@
+name: 一次性部署同步与分支清理
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/finalize-deploy-cleanup.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 获取 main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 安装网页生成依赖
+        run: python -m pip install --disable-pip-version-check pymupdf
+
+      - name: 同步中文版术语与官方注释前置内容到网页生成器
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('build_web_handbook.py')
+          text = path.read_text(encoding='utf-8')
+
+          replacements = {
+              '    "1": "比赛精神",': '    "1": "飞盘精神",',
+              '    "6": "开始比赛",': '    "6": "比赛开始",',
+              '    "7": "发盘",': '    "7": "开盘",',
+              '    "9": "stall 计数",': '    "9": "读秒",',
+              '    "10": "检查",': '    "10": "验盘（Check）",',
+              '    "12": "接盘者与站位",': '    "12": "接盘队员与位置",',
+              '    "13": "攻守转换",': '    "13": "攻防转换",',
+              '    "15": "犯规、违例与违规的呼叫",': '    "15": "犯规、违规和违例的示意",',
+              '    "16": "呼叫后的继续比赛",': '    "16": "示意后的比赛继续",',
+              '    "18": "违例与违规",': '    "18": "违规和违例",',
+              '    "19": "安全暂停",': '    "19": "安全中断",',
+              '["发盘（pull）", "每半场开始及得分后，由防守方发出、用于开始比赛的飞盘。"],': '["开盘（pull）", "每半场开始及得分后，由防守方发出、用于开始比赛的飞盘。"],',
+              '["攻守转换（turnover）", "导致拥有持盘权的队伍改变的任何事件；不属于违例。"],': '["攻防转换（turnover）", "导致拥有持盘权的队伍改变的任何事件；不属于违例。"],',
+              '["检查（check）", "暂停后的恢复程序；恢复后比赛重新进入 live 状态。"],': '["验盘（check）", "暂停后的恢复程序；恢复后比赛重新进入 live 状态。"],',
+              '["比赛精神（Spirit of the Game）", "极限飞盘的自主裁判基础：队员共同负责公平、规则与争议解决。"],': '["飞盘精神（Spirit of the Game）", "极限飞盘的自主裁判基础：队员共同负责公平、规则与争议解决。"],',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'找不到待替换文本：{old}')
+              text = text.replace(old, new, 1)
+
+          marker = '\n\ndef reviewed_annotations() -> tuple[dict[str, str], dict[str, object]]:\n'
+          if 'def reviewed_annotations_front_matter()' not in text:
+              if marker not in text:
+                  raise SystemExit('找不到 reviewed_annotations 插入位置')
+              helper = r'''
+
+
+def reviewed_annotations_front_matter() -> tuple[dict[str, str], dict[str, list[str]]]:
+    """Load the Chinese-only revision notice and contents placed before Introduction."""
+    markdown = REVIEWED_ANNOTATIONS_PATH.read_text(encoding="utf-8")
+    titles = {"Revision Notice": "修订公告", "Contents": "目录"}
+    content: dict[str, list[str]] = {"Revision Notice": [], "Contents": []}
+    current_section: str | None = None
+
+    def plain(value: str) -> str:
+        return value.strip().replace("**", "").replace("`", "")
+
+    for raw in markdown.splitlines():
+        line = raw.strip()
+        if line == "# 修订公告":
+            current_section = "Revision Notice"
+            continue
+        if line == "# 目录":
+            current_section = "Contents"
+            continue
+        if line == "# 引言":
+            break
+        if current_section is None or not line or line == "---" or line.startswith("#"):
+            continue
+        if line.startswith(">"):
+            line = line[1:].strip()
+        if line:
+            content[current_section].append(plain(line))
+    return titles, content
+'''
+              text = text.replace(marker, helper + marker, 1)
+
+          old = '    elif meta["id"] == "annotations":\n        reviewed_titles, reviewed = reviewed_annotations()\n'
+          new = old + '        front_titles, front_content = reviewed_annotations_front_matter()\n        reviewed_titles.update(front_titles)\n        reviewed.update(front_content)\n'
+          if 'front_titles, front_content = reviewed_annotations_front_matter()' not in text:
+              if old not in text:
+                  raise SystemExit('找不到官方注释加载逻辑')
+              text = text.replace(old, new, 1)
+
+          old = '    rendered = []\n    for section in sections:\n'
+          new = '''    rendered = []
+    if meta["id"] == "annotations":
+        for key in ("Revision Notice", "Contents"):
+            front_paragraphs = reviewed.get(key, [])
+            if front_paragraphs:
+                rendered.append({
+                    "id": f"annotations-{key.lower().replace(' ', '-')}",
+                    "key": key,
+                    "title": reviewed_titles[key],
+                    "paragraphs": [
+                        {"zh": value, "en": "", "page": None}
+                        for value in front_paragraphs
+                    ],
+                })
+    for section in sections:
+'''
+          if 'for key in ("Revision Notice", "Contents"):' not in text:
+              if old not in text:
+                  raise SystemExit('找不到 rendered 插入位置')
+              text = text.replace(old, new, 1)
+
+          required_marker = '        "24. Match Point / 赛点",\n'
+          additions = '        "本项目为非官方中文阅读版",\n        "修订公告",\n        "验盘（Check）",\n        "攻防转换",\n'
+          if '        "本项目为非官方中文阅读版",\n' not in text:
+              if required_marker not in text:
+                  raise SystemExit('找不到网页内容回归检查插入位置')
+              text = text.replace(required_marker, required_marker + additions, 1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: 重新生成网页数据并校验
+        shell: bash
+        run: |
+          python build_web_handbook.py
+          grep -Fq '修订公告' web/data.js
+          grep -Fq '本项目为非官方中文阅读版' web/data.js
+          grep -Fq '飞盘精神' web/data.js
+          grep -Fq '验盘（Check）' web/data.js
+          grep -Fq '攻防转换' web/data.js
+          git diff --check
+
+      - name: 提交生成器与网页数据同步
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add build_web_handbook.py web/data.js
+          git rm .github/workflows/finalize-deploy-cleanup.yml
+          git commit -m "Sync reviewed Chinese content into deployed handbook"
+          git push origin HEAD:main
+
+      - name: 清理已合并和临时分支
+        shell: bash
+        run: |
+          for branch in \
+            agent/fix-annotation-cross-references \
+            chore/chinese-content-finalize-20260818 \
+            fix/preserve-reading-position-toggle-source \
+            agent/deploy-sync-cleanup \
+            agent/deploy-sync-cleanup-temp
+          do
+            if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+              git push origin --delete "$branch"
+            fi
+          done
