@@ -1,79 +1,47 @@
-name: 验证 Pages 部署内容
+name: 验证 Pages 线上内容
 
 on:
-  workflow_run:
-    workflows: ["部署 GitHub Pages"]
-    types: [completed]
+  pull_request:
+    branches: [main]
+    types: [closed]
 
 permissions:
   contents: write
-  actions: read
 
 jobs:
-  report:
+  verify-live:
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - name: 获取 main
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-
-      - name: 记录部署结果并核验线上内容
+      - name: 等待并核验线上校订内容
         shell: bash
         env:
-          RUN_ID: ${{ github.event.workflow_run.id }}
-          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
-          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
+          RUN_KEY: ${{ github.run_id }}
         run: |
-          {
-            printf 'deploy_run_id=%s\n' "$RUN_ID"
-            printf 'deploy_sha=%s\n' "$DEPLOY_SHA"
-            printf 'conclusion=%s\n' "$CONCLUSION"
-            printf 'checked_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          } > .github/pages-deploy-status.txt
-
-          verified=false
-          if [ "$CONCLUSION" = "success" ]; then
-            for attempt in $(seq 1 12); do
-              if curl -fsSL --retry 3 --retry-delay 2 \
-                "https://hooooyu.github.io/frisbee-rules-manual/data.js?verify=${RUN_ID}-${attempt}" \
-                -o /tmp/live-data.js \
-                && grep -Fq '"title":"修订公告"' /tmp/live-data.js \
-                && grep -Fq '"title":"目录"' /tmp/live-data.js \
-                && grep -Fq '本项目为非官方中文阅读版' /tmp/live-data.js \
-                && grep -Fq '"title":"飞盘精神"' /tmp/live-data.js \
-                && grep -Fq '"title":"验盘（Check）"' /tmp/live-data.js \
-                && grep -Fq '"title":"攻防转换"' /tmp/live-data.js; then
-                verified=true
-                break
-              fi
-              sleep 5
-            done
-            printf 'live_content_verified=%s\n' "$verified" >> .github/pages-deploy-status.txt
-          else
-            printf 'live_content_verified=false\n' >> .github/pages-deploy-status.txt
-            printf '\n--- failed log ---\n' >> .github/pages-deploy-status.txt
-            gh run view "$RUN_ID" --repo "$REPO" --log-failed >> .github/pages-deploy-status.txt 2>&1 || true
-          fi
-
-      - name: 清理本轮验证分支
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          for branch in docs/update-reviewed-build-command chore/remove-one-time-deploy chore/final-pages-verify; do
-            gh api --method DELETE "repos/$REPO/git/refs/heads/$branch" >/dev/null 2>&1 || true
+          for attempt in $(seq 1 36); do
+            if curl -fsSL --retry 2 --retry-delay 2 \
+              "https://hooooyu.github.io/frisbee-rules-manual/data.js?verify=${RUN_KEY}-${attempt}" \
+              -o /tmp/live-data.js \
+              && grep -Fq '"title":"修订公告"' /tmp/live-data.js \
+              && grep -Fq '"title":"目录"' /tmp/live-data.js \
+              && grep -Fq '本项目为非官方中文阅读版' /tmp/live-data.js \
+              && grep -Fq '"title":"飞盘精神"' /tmp/live-data.js \
+              && grep -Fq '"title":"验盘（Check）"' /tmp/live-data.js \
+              && grep -Fq '"title":"攻防转换"' /tmp/live-data.js; then
+              echo "线上 Pages 已包含本轮校订内容。"
+              exit 0
+            fi
+            sleep 5
           done
+          echo "线上 Pages 在验证窗口内仍未出现本轮校订内容。" >&2
+          exit 1
 
-      - name: 提交部署状态
+      - name: 删除本次已合并分支
+        if: always()
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          MERGED_HEAD: ${{ github.event.pull_request.head.ref }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/pages-deploy-status.txt
-          git commit -m "Record Pages deployment status"
-          git push origin HEAD:main
+          [ "$MERGED_HEAD" = "main" ] || gh api --method DELETE "repos/$REPO/git/refs/heads/$MERGED_HEAD" >/dev/null 2>&1 || true
