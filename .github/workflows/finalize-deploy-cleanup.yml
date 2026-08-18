@@ -1,27 +1,22 @@
-name: 一次性部署同步与分支清理
+name: 一次性网页同步
 
 on:
-  push:
+  pull_request:
     branches: [main]
-    paths:
-      - .github/workflows/finalize-deploy-cleanup.yml
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
-  finalize:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  sync-web:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - name: 获取 main
+      - name: 获取 PR 分支
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 
       - name: 配置 Python
@@ -32,7 +27,7 @@ jobs:
       - name: 安装网页生成依赖
         run: python -m pip install --disable-pip-version-check pymupdf
 
-      - name: 同步中文版术语与官方注释前置内容到网页生成器
+      - name: 更新网页生成器
         shell: bash
         run: |
           python - <<'PY'
@@ -59,27 +54,24 @@ jobs:
               '["比赛精神（Spirit of the Game）", "极限飞盘的自主裁判基础：队员共同负责公平、规则与争议解决。"],': '["飞盘精神（Spirit of the Game）", "极限飞盘的自主裁判基础：队员共同负责公平、规则与争议解决。"],',
           }
           for old, new in replacements.items():
-              if old not in text:
-                  raise SystemExit(f'找不到待替换文本：{old}')
-              text = text.replace(old, new, 1)
+              if old in text:
+                  text = text.replace(old, new, 1)
+              elif new not in text:
+                  raise SystemExit(f'术语状态异常：{old}')
 
           marker = '\n\ndef reviewed_annotations() -> tuple[dict[str, str], dict[str, object]]:\n'
           if 'def reviewed_annotations_front_matter()' not in text:
               if marker not in text:
-                  raise SystemExit('找不到 reviewed_annotations 插入位置')
+                  raise SystemExit('找不到官方注释函数插入位置')
               helper = r'''
 
 
 def reviewed_annotations_front_matter() -> tuple[dict[str, str], dict[str, list[str]]]:
-    """Load the Chinese-only revision notice and contents placed before Introduction."""
+    """Load Chinese-only revision notice and contents before Introduction."""
     markdown = REVIEWED_ANNOTATIONS_PATH.read_text(encoding="utf-8")
     titles = {"Revision Notice": "修订公告", "Contents": "目录"}
     content: dict[str, list[str]] = {"Revision Notice": [], "Contents": []}
     current_section: str | None = None
-
-    def plain(value: str) -> str:
-        return value.strip().replace("**", "").replace("`", "")
-
     for raw in markdown.splitlines():
         line = raw.strip()
         if line == "# 修订公告":
@@ -90,56 +82,53 @@ def reviewed_annotations_front_matter() -> tuple[dict[str, str], dict[str, list[
             continue
         if line == "# 引言":
             break
-        if current_section is None or not line or line == "---" or line.startswith("#"):
+        if current_section is None or not line or line.startswith("#"):
             continue
         if line.startswith(">"):
             line = line[1:].strip()
         if line:
-            content[current_section].append(plain(line))
+            content[current_section].append(line.replace("**", "").replace("`", ""))
     return titles, content
 '''
               text = text.replace(marker, helper + marker, 1)
 
-          old = '    elif meta["id"] == "annotations":\n        reviewed_titles, reviewed = reviewed_annotations()\n'
-          new = old + '        front_titles, front_content = reviewed_annotations_front_matter()\n        reviewed_titles.update(front_titles)\n        reviewed.update(front_content)\n'
-          if 'front_titles, front_content = reviewed_annotations_front_matter()' not in text:
-              if old not in text:
+          anchor = '    elif meta["id"] == "annotations":\n        reviewed_titles, reviewed = reviewed_annotations()\n'
+          extra = '        front_titles, front_content = reviewed_annotations_front_matter()\n        reviewed_titles.update(front_titles)\n        reviewed.update(front_content)\n'
+          if extra not in text:
+              if anchor not in text:
                   raise SystemExit('找不到官方注释加载逻辑')
-              text = text.replace(old, new, 1)
+              text = text.replace(anchor, anchor + extra, 1)
 
-          old = '    rendered = []\n    for section in sections:\n'
-          new = '''    rendered = []
+          anchor = '    rendered = []\n    for section in sections:\n'
+          replacement = '''    rendered = []
     if meta["id"] == "annotations":
         for key in ("Revision Notice", "Contents"):
-            front_paragraphs = reviewed.get(key, [])
-            if front_paragraphs:
+            values = reviewed.get(key, [])
+            if values:
                 rendered.append({
                     "id": f"annotations-{key.lower().replace(' ', '-')}",
                     "key": key,
                     "title": reviewed_titles[key],
-                    "paragraphs": [
-                        {"zh": value, "en": "", "page": None}
-                        for value in front_paragraphs
-                    ],
+                    "paragraphs": [{"zh": value, "en": "", "page": None} for value in values],
                 })
     for section in sections:
 '''
           if 'for key in ("Revision Notice", "Contents"):' not in text:
-              if old not in text:
-                  raise SystemExit('找不到 rendered 插入位置')
-              text = text.replace(old, new, 1)
+              if anchor not in text:
+                  raise SystemExit('找不到网页章节插入位置')
+              text = text.replace(anchor, replacement, 1)
 
-          required_marker = '        "24. Match Point / 赛点",\n'
-          additions = '        "本项目为非官方中文阅读版",\n        "修订公告",\n        "验盘（Check）",\n        "攻防转换",\n'
+          required_anchor = '        "24. Match Point / 赛点",\n'
+          required_extra = '        "本项目为非官方中文阅读版",\n        "修订公告",\n        "验盘（Check）",\n        "攻防转换",\n'
           if '        "本项目为非官方中文阅读版",\n' not in text:
-              if required_marker not in text:
-                  raise SystemExit('找不到网页内容回归检查插入位置')
-              text = text.replace(required_marker, required_marker + additions, 1)
+              if required_anchor not in text:
+                  raise SystemExit('找不到回归检查插入位置')
+              text = text.replace(required_anchor, required_anchor + required_extra, 1)
 
           path.write_text(text, encoding='utf-8')
           PY
 
-      - name: 重新生成网页数据并校验
+      - name: 重新生成并校验网页
         shell: bash
         run: |
           python build_web_handbook.py
@@ -150,41 +139,18 @@ def reviewed_annotations_front_matter() -> tuple[dict[str, str], dict[str, list[
           grep -Fq '攻防转换' web/data.js
           git diff --check
 
-      - name: 提交生成器与网页数据同步
+      - name: 提交生成结果到 PR 分支
         shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f --ignore-unmatch .github/deploy-sync.trigger
           git add build_web_handbook.py web/data.js
-          git rm .github/workflows/finalize-deploy-cleanup.yml
-          git commit -m "Sync reviewed Chinese content into deployed handbook"
-          git push origin HEAD:main
-
-      - name: 配置 Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - name: 打包最新网页
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: web
-
-      - name: 直接部署最新网页
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-      - name: 清理已合并和临时分支
-        shell: bash
-        run: |
-          for branch in \
-            agent/fix-annotation-cross-references \
-            chore/chinese-content-finalize-20260818 \
-            fix/preserve-reading-position-toggle-source \
-            agent/deploy-sync-cleanup \
-            agent/deploy-sync-cleanup-temp
-          do
-            if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
-              git push origin --delete "$branch"
-            fi
-          done
+          if git diff --cached --quiet; then
+            echo "没有需要提交的同步变更"
+            exit 0
+          fi
+          git commit -m "Sync reviewed Chinese content into web handbook"
+          git push origin HEAD:"$HEAD_BRANCH"
