@@ -1,21 +1,21 @@
 name: 一次性中文内容校正收口
 
 on:
-  push:
+  pull_request:
     branches: [main]
-    paths:
-      - .github/workflows/chinese-content-finalize.yml
 
 permissions:
   contents: write
 
 jobs:
   finalize:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - name: 获取代码
+      - name: 获取 PR 分支
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: 校正官方注释并补充修订公告与目录
@@ -51,9 +51,6 @@ jobs:
               20: '暂停',
           }
 
-          if '# 修订公告' in text or '# 目录' in text:
-              raise SystemExit('修订公告或目录已经存在，停止以避免重复插入')
-
           for number, title in canonical.items():
               text, count = re.subn(
                   rf'^# {number}\.\s*.*$',
@@ -65,43 +62,31 @@ jobs:
               if count != 1:
                   raise SystemExit(f'第 {number} 章标题数量异常：{count}')
 
-          notice = '''# 修订公告
+          if '# 修订公告' not in text and '# 目录' not in text:
+              notice = '''# 修订公告
 
 > 本项目为非官方中文阅读版。正式比赛请以赛事公布的适用版本、WFDF 英文原版及现场裁量为准。
 >
 > 本次修订对中文版内容进行了逐条校正与术语统一；修订仅用于提升中文译文的准确性、一致性与可读性，不构成 WFDF 官方中文版本。如中文表述与 WFDF 英文原文存在歧义或冲突，以 WFDF 英文原文为准。'''
-
-          toc_lines = ['引言', '原则'] + [f'{number}. {canonical[number]}' for number in range(1, 21)]
-          toc = '# 目录\n\n' + '  \n'.join(toc_lines)
-
-          if text.count('# 引言') != 1:
-              raise SystemExit('引言标题数量异常')
-          before, after = text.split('# 引言', 1)
-          text = before.rstrip() + '\n\n' + notice + '\n\n' + toc + '\n\n# 引言' + after
+              toc_lines = ['引言', '原则'] + [f'{number}. {canonical[number]}' for number in range(1, 21)]
+              toc = '# 目录\n\n' + '  \n'.join(toc_lines)
+              if text.count('# 引言') != 1:
+                  raise SystemExit('引言标题数量异常')
+              before, after = text.split('# 引言', 1)
+              text = before.rstrip() + '\n\n' + notice + '\n\n' + toc + '\n\n# 引言' + after
+          elif not ('# 修订公告' in text and '# 目录' in text):
+              raise SystemExit('修订公告与目录状态不一致')
 
           required = [
-              '# 修订公告',
-              '# 目录',
-              '# 1. 飞盘精神',
-              '# 7. 开盘',
-              '# 9. 读秒',
-              '# 10. 验盘（Check）',
-              '# 12. 接盘队员与位置',
-              '# 13. 攻防转换',
-              '# 15. 犯规、违规和违例的示意',
-              '# 16. 示意后的比赛继续',
-              '# 18. 违规和违例',
-              '# 19. 安全中断',
-              '显著的严重伤害风险',
-              '## 18.13. 拍盘（Tipping）（18.2.5.5）',
-              '9.5.5',
-              '9.5.5.1',
-              '9.5.5.2',
+              '# 修订公告', '# 目录', '# 1. 飞盘精神', '# 7. 开盘', '# 9. 读秒',
+              '# 10. 验盘（Check）', '# 12. 接盘队员与位置', '# 13. 攻防转换',
+              '# 15. 犯规、违规和违例的示意', '# 16. 示意后的比赛继续',
+              '# 18. 违规和违例', '# 19. 安全中断', '显著的严重伤害风险',
+              '## 18.13. 拍盘（Tipping）（18.2.5.5）', '9.5.5', '9.5.5.1', '9.5.5.2',
           ]
           missing = [item for item in required if item not in text]
           if missing:
               raise SystemExit(f'校正回归检查失败：{missing}')
-
           if not (text.index('# 修订公告') < text.index('# 目录') < text.index('# 引言')):
               raise SystemExit('修订公告、目录、引言顺序错误')
 
@@ -109,11 +94,12 @@ jobs:
           print('官方注释中文版校正完成。')
           PY
 
-      - name: 检查并提交
+      - name: 检查并提交到 PR 分支
         shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
         run: |
           git diff --check
-          git diff -- docs/WFDF团队飞盘规则2025-2028_官方注释_中文校订整合版.md
           if git diff --quiet; then
             echo "没有需要提交的变更"
             exit 0
@@ -122,4 +108,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/WFDF团队飞盘规则2025-2028_官方注释_中文校订整合版.md
           git commit -m "Finalize Chinese annotations wording and front matter"
-          git push origin HEAD:main
+          git push origin HEAD:"$HEAD_BRANCH"
