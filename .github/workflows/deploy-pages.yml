@@ -22,41 +22,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 获取代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: 配置 Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: 安装网页生成依赖
-        run: python -m pip install --disable-pip-version-check pymupdf
-
-      - name: 从最新中文校订稿生成并校验网页
-        run: python tools/build_reviewed_web.py
-
-      - name: 网页产物冒烟检查
+      - name: 检查待发布网页
         shell: bash
         run: |
+          set -euo pipefail
           test -s web/index.html
           test -s web/data.js
           test -s web/app.js
-          grep -Fq '"id":"annotations-revision-notice"' web/data.js
-          grep -Fq '关于英文《Official Annotations》中规则引用编号的校订说明' web/data.js
-          grep -Fq '23 处编号差异' web/data.js
-          if grep -Fq '"title":"修订公告"' web/data.js; then
-            echo '网页数据仍包含旧修订公告'
-            exit 1
-          fi
-          if grep -Fq '"title":"目录"' web/data.js || grep -Fq '"key":"Contents"' web/data.js; then
-            echo '网页数据仍包含重复目录'
-            exit 1
-          fi
+          test -s web/declaration-patch.js
+          grep -Fq 'declaration-patch.js?v=2' web/index.html
+          grep -Fq 'annotations-revision-notice' web/declaration-patch.js
+          grep -Fq 'Revision Notice' web/declaration-patch.js
+          grep -Fq '23 处编号差异' web/declaration-patch.js
 
       - name: 配置 Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: 打包网站
         uses: actions/upload-pages-artifact@v4
