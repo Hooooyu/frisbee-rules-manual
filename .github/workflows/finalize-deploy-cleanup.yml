@@ -8,9 +8,14 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   finalize:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: 获取 main
@@ -154,6 +159,20 @@ def reviewed_annotations_front_matter() -> tuple[dict[str, str], dict[str, list[
           git rm .github/workflows/finalize-deploy-cleanup.yml
           git commit -m "Sync reviewed Chinese content into deployed handbook"
           git push origin HEAD:main
+
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: 打包最新网页
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - name: 直接部署最新网页
+        id: deployment
+        uses: actions/deploy-pages@v4
 
       - name: 清理已合并和临时分支
         shell: bash
