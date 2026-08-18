@@ -35,37 +35,83 @@ CANONICAL_MAIN_TITLES = {
     "20": "暂停",
 }
 
+DECLARATION_PATH = handbook.DOCS / "官方注释_规则引用编号校订说明.md"
+
+
+def clean_markdown_inline(text: str) -> str:
+    return text.replace("**", "").replace("`", "").strip()
+
 
 def annotation_revision_notice() -> dict:
-    """Return only the source-authored Chinese revision notice before Introduction."""
-    markdown = handbook.REVIEWED_ANNOTATIONS_PATH.read_text(encoding="utf-8")
-    content: list[str] = []
-    in_notice = False
+    """Load the canonical cross-reference correction declaration shown before Introduction."""
+    markdown = DECLARATION_PATH.read_text(encoding="utf-8")
+    lines = markdown.splitlines()
+    title = ""
+    body_start = 0
 
-    for raw in markdown.splitlines():
+    for index, raw in enumerate(lines):
         line = raw.strip()
-        if line == "# 修订公告":
-            in_notice = True
-            continue
-        if in_notice and line in {"# 目录", "# 引言"}:
+        if line.startswith("## "):
+            title = clean_markdown_inline(line[3:])
+            body_start = index + 1
             break
-        if not in_notice or not line or line.startswith("#"):
-            continue
-        if line.startswith(">"):
-            line = line[1:].strip()
-        if line:
-            content.append(line.replace("**", "").replace("`", ""))
 
-    if not content:
-        raise ValueError("官方注释修订公告缺失")
+    if not title:
+        raise ValueError("规则引用编号校订说明缺少标题")
+
+    blocks: list[list[str]] = []
+    current: list[str] = []
+    for raw in lines[body_start:]:
+        if raw.strip():
+            current.append(raw.rstrip())
+        elif current:
+            blocks.append(current)
+            current = []
+    if current:
+        blocks.append(current)
+
+    paragraphs: list[str] = []
+    index = 0
+    while index < len(blocks):
+        block = blocks[index]
+        stripped = [line.strip() for line in block]
+
+        if stripped[0].startswith("### "):
+            heading = clean_markdown_inline(stripped[0][4:])
+            if index + 1 < len(blocks) and all(line.strip().startswith("|") for line in blocks[index + 1]):
+                table = "\n".join(clean_markdown_inline(line) for line in blocks[index + 1])
+                paragraphs.append(f"{heading}\n{table}")
+                index += 2
+                continue
+            paragraphs.append(heading)
+            index += 1
+            continue
+
+        if all(line.startswith("- ") for line in stripped):
+            paragraphs.extend(f"• {clean_markdown_inline(line[2:])}" for line in stripped)
+            index += 1
+            continue
+
+        if all(line.startswith("|") for line in stripped):
+            paragraphs.append("\n".join(clean_markdown_inline(line) for line in stripped))
+            index += 1
+            continue
+
+        paragraphs.append(clean_markdown_inline(" ".join(stripped)))
+        index += 1
+
+    if not paragraphs or not any("23 处" in paragraph for paragraph in paragraphs):
+        raise ValueError("规则引用编号校订说明内容不完整")
+    if not any("| 23 |" in paragraph for paragraph in paragraphs):
+        raise ValueError("规则引用编号差异表未完整载入 23 条记录")
 
     return {
         "id": "annotations-revision-notice",
         "key": "",
-        "title": "修订公告",
+        "title": title,
         "paragraphs": [
             {"zh": value, "en": "", "page": None}
-            for value in content
+            for value in paragraphs
         ],
     }
 
@@ -100,7 +146,10 @@ def normalize_quick_terms() -> None:
 def validate() -> None:
     data = (handbook.WEB / "data.js").read_text(encoding="utf-8")
     required = (
-        '"id":"annotations-revision-notice","key":"","title":"修订公告"',
+        '"id":"annotations-revision-notice","key":"","title":"关于英文《Official Annotations》中规则引用编号的校订说明"',
+        "部分中文注释中的规则编号会有意与英文 Official Annotations PDF 不同",
+        "下表完整记录目前确认的 23 处编号差异",
+        "| 23 | 18.15「走步违例后的比赛恢复」标题 | 18.2.7 | 18.2.6 | 待校正 |",
         '"title":"飞盘精神"',
         '"title":"比赛开始"',
         '"title":"开盘"',
@@ -124,8 +173,10 @@ def validate() -> None:
         if paragraph["zh"] not in data
     ]
     if notice_missing:
-        raise ValueError(f"修订公告未按中文源稿同步：{notice_missing}")
+        raise ValueError(f"规则引用编号校订说明未完整同步：{notice_missing}")
 
+    if '"title":"修订公告"' in data:
+        raise ValueError("网页仍在显示被替换的通用修订公告")
     if '"title":"目录"' in data or '"key":"Contents"' in data:
         raise ValueError("网页正文不应重复渲染目录；请使用网页侧栏目录")
 
