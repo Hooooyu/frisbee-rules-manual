@@ -7,38 +7,63 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
-  verify:
-    if: github.event.workflow_run.conclusion == 'success'
+  report:
     runs-on: ubuntu-latest
     steps:
       - name: 获取 main
         uses: actions/checkout@v4
         with:
           ref: main
+          fetch-depth: 0
 
-      - name: 验证线上网页包含最新校订内容
-        shell: bash
-        run: |
-          curl -fsSL --retry 6 --retry-delay 5 \
-            https://hooooyu.github.io/frisbee-rules-manual/data.js \
-            -o /tmp/live-data.js
-          grep -Fq '"title":"修订公告"' /tmp/live-data.js
-          grep -Fq '"title":"目录"' /tmp/live-data.js
-          grep -Fq '本项目为非官方中文阅读版' /tmp/live-data.js
-          grep -Fq '"title":"飞盘精神"' /tmp/live-data.js
-          grep -Fq '"title":"验盘（Check）"' /tmp/live-data.js
-          grep -Fq '"title":"攻防转换"' /tmp/live-data.js
-
-      - name: 记录一次性验证结果
+      - name: 记录部署结果
         shell: bash
         env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
           DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
-          printf 'verified=%s\ndeploy_sha=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$DEPLOY_SHA" > .github/pages-deploy-verified.txt
+          {
+            printf 'deploy_run_id=%s\n' "$RUN_ID"
+            printf 'deploy_sha=%s\n' "$DEPLOY_SHA"
+            printf 'conclusion=%s\n' "$CONCLUSION"
+            printf 'checked_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > .github/pages-deploy-status.txt
+
+          if [ "$CONCLUSION" = "success" ]; then
+            curl -fsSL --retry 8 --retry-delay 5 \
+              https://hooooyu.github.io/frisbee-rules-manual/data.js \
+              -o /tmp/live-data.js
+            grep -Fq '"title":"修订公告"' /tmp/live-data.js
+            grep -Fq '"title":"目录"' /tmp/live-data.js
+            grep -Fq '本项目为非官方中文阅读版' /tmp/live-data.js
+            grep -Fq '"title":"飞盘精神"' /tmp/live-data.js
+            grep -Fq '"title":"验盘（Check）"' /tmp/live-data.js
+            grep -Fq '"title":"攻防转换"' /tmp/live-data.js
+            printf 'live_content_verified=true\n' >> .github/pages-deploy-status.txt
+          else
+            printf '\n--- failed log ---\n' >> .github/pages-deploy-status.txt
+            gh run view "$RUN_ID" --repo "$REPO" --log-failed >> .github/pages-deploy-status.txt 2>&1 || true
+          fi
+
+      - name: 清理本轮验证分支
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api --method DELETE "repos/$REPO/git/refs/heads/docs/update-reviewed-build-command" >/dev/null 2>&1 || true
+
+      - name: 提交部署状态
+        shell: bash
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/pages-deploy-verified.txt
-          git commit -m "Record verified Pages deployment"
+          git add .github/pages-deploy-status.txt
+          git commit -m "Record Pages deployment status"
           git push origin HEAD:main
