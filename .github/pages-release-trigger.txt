@@ -1,0 +1,4 @@
+GitHub Pages release trigger
+
+Triggered at 2026-08-18T23:53:00+08:00
+Purpose: publish the corrected Official Annotations declaration and 23-item cross-reference correction table.
