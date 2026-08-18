@@ -19,7 +19,7 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: 记录部署结果
+      - name: 记录部署结果并核验线上内容
         shell: bash
         env:
           RUN_ID: ${{ github.event.workflow_run.id }}
@@ -35,18 +35,26 @@ jobs:
             printf 'checked_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } > .github/pages-deploy-status.txt
 
+          verified=false
           if [ "$CONCLUSION" = "success" ]; then
-            curl -fsSL --retry 8 --retry-delay 5 \
-              https://hooooyu.github.io/frisbee-rules-manual/data.js \
-              -o /tmp/live-data.js
-            grep -Fq '"title":"修订公告"' /tmp/live-data.js
-            grep -Fq '"title":"目录"' /tmp/live-data.js
-            grep -Fq '本项目为非官方中文阅读版' /tmp/live-data.js
-            grep -Fq '"title":"飞盘精神"' /tmp/live-data.js
-            grep -Fq '"title":"验盘（Check）"' /tmp/live-data.js
-            grep -Fq '"title":"攻防转换"' /tmp/live-data.js
-            printf 'live_content_verified=true\n' >> .github/pages-deploy-status.txt
+            for attempt in $(seq 1 12); do
+              if curl -fsSL --retry 3 --retry-delay 2 \
+                "https://hooooyu.github.io/frisbee-rules-manual/data.js?verify=${RUN_ID}-${attempt}" \
+                -o /tmp/live-data.js \
+                && grep -Fq '"title":"修订公告"' /tmp/live-data.js \
+                && grep -Fq '"title":"目录"' /tmp/live-data.js \
+                && grep -Fq '本项目为非官方中文阅读版' /tmp/live-data.js \
+                && grep -Fq '"title":"飞盘精神"' /tmp/live-data.js \
+                && grep -Fq '"title":"验盘（Check）"' /tmp/live-data.js \
+                && grep -Fq '"title":"攻防转换"' /tmp/live-data.js; then
+                verified=true
+                break
+              fi
+              sleep 5
+            done
+            printf 'live_content_verified=%s\n' "$verified" >> .github/pages-deploy-status.txt
           else
+            printf 'live_content_verified=false\n' >> .github/pages-deploy-status.txt
             printf '\n--- failed log ---\n' >> .github/pages-deploy-status.txt
             gh run view "$RUN_ID" --repo "$REPO" --log-failed >> .github/pages-deploy-status.txt 2>&1 || true
           fi
@@ -57,7 +65,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
-          for branch in docs/update-reviewed-build-command chore/remove-one-time-deploy; do
+          for branch in docs/update-reviewed-build-command chore/remove-one-time-deploy chore/final-pages-verify; do
             gh api --method DELETE "repos/$REPO/git/refs/heads/$branch" >/dev/null 2>&1 || true
           done
 
