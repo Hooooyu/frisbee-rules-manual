@@ -53,7 +53,7 @@
 
 ## 本地运行
 
-项目为无构建依赖的静态网站。在仓库根目录运行：
+项目为无前端构建依赖的静态网站。在仓库根目录运行：
 
 ```bash
 python -m http.server 8000 -d web
@@ -66,20 +66,22 @@ python -m http.server 8000 -d web
 `docs/` 是规则源资料目录。修改中文校订稿、英文 PDF 或图示素材后，在仓库根目录运行：
 
 ```bash
-python build_web_handbook.py
+python -m pip install pymupdf
+python tools/build_reviewed_web.py
 ```
 
-脚本会重新生成 `web/data.js` 及相关网页图片。请勿直接把生成物作为规则源文档编辑。
+校订版构建入口会基于 `build_web_handbook.py` 重新生成 `web/data.js` 及相关网页图片，同时应用已确认的中文章节术语，并把官方注释开头的修订公告和目录纳入网页数据。请勿直接把生成物作为规则源文档编辑。
 
 ## 目录结构
 
 ```text
 .
-├── docs/                  # 中文校订稿、英文原版 PDF、图示素材与勘误记录
-├── tools/                 # 素材提取工具
-├── web/                   # 可直接部署的静态网站
+├── docs/                       # 中文校订稿、英文原版 PDF、图示素材与勘误记录
+├── tools/                      # 素材提取工具与校订版网页构建入口
+│   └── build_reviewed_web.py
+├── web/                        # 可直接部署的静态网站
 ├── build_source_documents.py
-└── build_web_handbook.py  # 网页数据与图片生成脚本
+└── build_web_handbook.py       # 基础网页数据与图片生成脚本
 ```
 
 ## 资料来源与许可
