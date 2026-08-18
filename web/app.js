@@ -45,7 +45,7 @@
     const { zh, en } = bilingualTitle(value, fallbackEnglish);
     return `<span class="${className}"><span class="${className}-zh">${escape(zh)}</span>${en ? `<span class="${className}-en" lang="en">${escape(en)}</span>` : ""}</span>`;
   };
-  const sectionKey = (section) => ["Introduction", "Definitions", "Legal License"].includes(section.key) || section.key.startsWith("appendix-") ? "" : section.key;
+  const sectionKey = (section) => ["Introduction", "Principles", "Definitions", "Legal License"].includes(section.key) || section.key.startsWith("appendix-") ? "" : section.key;
   const appendixLabel = (section) => section.key.startsWith("appendix-") ? `附录 ${section.key.at(-1).toUpperCase()}：${section.title}` : "";
   const displaySectionTitle = (section) => appendixLabel(section) || section.title;
   const sectionName = (section) => `${section.key === "Introduction" ? "" : `${section.key} `}${section.title}`;
