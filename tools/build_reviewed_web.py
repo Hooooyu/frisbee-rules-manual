@@ -116,6 +116,15 @@ def annotation_revision_notice() -> dict:
     }
 
 
+def is_legacy_annotation_front_matter(section: dict) -> bool:
+    """Return True for the old source-authored notice/contents that must not render on the web."""
+    return (
+        section.get("id") == "annotations-revision-notice"
+        or section.get("title") in {"修订公告", "目录"}
+        or section.get("key") in {"Revision Notice", "Contents"}
+    )
+
+
 def install_reviewed_overrides() -> None:
     handbook.MAIN_TITLES.update(CANONICAL_MAIN_TITLES)
     original_translate = handbook.translate_source_sections
@@ -123,7 +132,12 @@ def install_reviewed_overrides() -> None:
     def translate_source_sections(meta: dict, sections: list[dict]) -> dict:
         rendered = original_translate(meta, sections)
         if meta["id"] == "annotations":
-            rendered["sections"] = [annotation_revision_notice(), *rendered["sections"]]
+            clean_sections = [
+                section
+                for section in rendered["sections"]
+                if not is_legacy_annotation_front_matter(section)
+            ]
+            rendered["sections"] = [annotation_revision_notice(), *clean_sections]
         return rendered
 
     handbook.translate_source_sections = translate_source_sections
