@@ -61,4 +61,17 @@
       section.key !== "Contents"
     ),
   ];
+
+  const decorateRevisionNoticeToc = () => {
+    const link = document.querySelector('#toc a[href="#annotations-revision-notice"]');
+    if (!link) return;
+    const titleNode = link.querySelector(".toc-title") || link;
+    titleNode.innerHTML = '<span class="toc-title-zh">修订公告</span><span class="toc-title-en" lang="en">Revision Notice</span>';
+  };
+
+  window.addEventListener("DOMContentLoaded", () => {
+    decorateRevisionNoticeToc();
+    const toc = document.querySelector("#toc");
+    if (toc) new MutationObserver(decorateRevisionNoticeToc).observe(toc, { childList: true, subtree: true });
+  });
 })();
