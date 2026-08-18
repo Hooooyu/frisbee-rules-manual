@@ -36,46 +36,38 @@ CANONICAL_MAIN_TITLES = {
 }
 
 
-def annotation_front_matter() -> list[dict]:
-    """Return the Chinese-only revision notice and contents before Introduction."""
+def annotation_revision_notice() -> dict:
+    """Return only the source-authored Chinese revision notice before Introduction."""
     markdown = handbook.REVIEWED_ANNOTATIONS_PATH.read_text(encoding="utf-8")
-    titles = {"Revision Notice": "修订公告", "Contents": "目录"}
-    content: dict[str, list[str]] = {"Revision Notice": [], "Contents": []}
-    current: str | None = None
+    content: list[str] = []
+    in_notice = False
 
     for raw in markdown.splitlines():
         line = raw.strip()
         if line == "# 修订公告":
-            current = "Revision Notice"
+            in_notice = True
             continue
-        if line == "# 目录":
-            current = "Contents"
-            continue
-        if line == "# 引言":
+        if in_notice and line in {"# 目录", "# 引言"}:
             break
-        if current is None or not line or line.startswith("#"):
+        if not in_notice or not line or line.startswith("#"):
             continue
         if line.startswith(">"):
             line = line[1:].strip()
         if line:
-            content[current].append(line.replace("**", "").replace("`", ""))
+            content.append(line.replace("**", "").replace("`", ""))
 
-    sections = []
-    for key in ("Revision Notice", "Contents"):
-        if not content[key]:
-            raise ValueError(f"官方注释前置章节缺失：{titles[key]}")
-        sections.append(
-            {
-                "id": f"annotations-{key.lower().replace(' ', '-')}",
-                "key": key,
-                "title": titles[key],
-                "paragraphs": [
-                    {"zh": value, "en": "", "page": None}
-                    for value in content[key]
-                ],
-            }
-        )
-    return sections
+    if not content:
+        raise ValueError("官方注释修订公告缺失")
+
+    return {
+        "id": "annotations-revision-notice",
+        "key": "",
+        "title": "修订公告",
+        "paragraphs": [
+            {"zh": value, "en": "", "page": None}
+            for value in content
+        ],
+    }
 
 
 def install_reviewed_overrides() -> None:
@@ -85,7 +77,7 @@ def install_reviewed_overrides() -> None:
     def translate_source_sections(meta: dict, sections: list[dict]) -> dict:
         rendered = original_translate(meta, sections)
         if meta["id"] == "annotations":
-            rendered["sections"] = [*annotation_front_matter(), *rendered["sections"]]
+            rendered["sections"] = [annotation_revision_notice(), *rendered["sections"]]
         return rendered
 
     handbook.translate_source_sections = translate_source_sections
@@ -108,9 +100,7 @@ def normalize_quick_terms() -> None:
 def validate() -> None:
     data = (handbook.WEB / "data.js").read_text(encoding="utf-8")
     required = (
-        '"title":"修订公告"',
-        '"title":"目录"',
-        "本项目为非官方中文阅读版",
+        '"id":"annotations-revision-notice","key":"","title":"修订公告"',
         '"title":"飞盘精神"',
         '"title":"比赛开始"',
         '"title":"开盘"',
@@ -126,6 +116,18 @@ def validate() -> None:
     missing = [value for value in required if value not in data]
     if missing:
         raise ValueError(f"校订网页内容缺失：{missing}")
+
+    notice = annotation_revision_notice()
+    notice_missing = [
+        paragraph["zh"]
+        for paragraph in notice["paragraphs"]
+        if paragraph["zh"] not in data
+    ]
+    if notice_missing:
+        raise ValueError(f"修订公告未按中文源稿同步：{notice_missing}")
+
+    if '"title":"目录"' in data or '"key":"Contents"' in data:
+        raise ValueError("网页正文不应重复渲染目录；请使用网页侧栏目录")
 
 
 if __name__ == "__main__":

@@ -39,11 +39,18 @@ jobs:
         shell: bash
         run: |
           grep -Fq '"title":"修订公告"' web/data.js
-          grep -Fq '"title":"目录"' web/data.js
           grep -Fq '本项目为非官方中文阅读版' web/data.js
           grep -Fq '"title":"飞盘精神"' web/data.js
           grep -Fq '"title":"验盘（Check）"' web/data.js
           grep -Fq '"title":"攻防转换"' web/data.js
+          if grep -Fq '"title":"目录"' web/data.js; then
+            echo '网页正文错误地重复渲染了目录'
+            exit 1
+          fi
+          if grep -Fq '"key":"Contents"' web/data.js; then
+            echo '网页数据仍包含旧的 Contents 正文章节'
+            exit 1
+          fi
 
       - name: 配置 Pages
         uses: actions/configure-pages@v5
