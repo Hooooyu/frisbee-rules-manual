@@ -1,6 +1,7 @@
-deploy_run_id=32151711611
-deploy_sha=84b28567676eb18275426a6153622334c66bb36b
+deploy_run_id=32151791705
+deploy_sha=7852c3e36f5940c027e50572052f43611299c459
 conclusion=cancelled
-checked_at=2026-08-18T15:01:10Z
+checked_at=2026-08-18T15:04:40Z
+live_content_verified=false
 
 --- failed log ---
