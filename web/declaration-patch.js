@@ -66,12 +66,18 @@
     const link = document.querySelector('#toc a[href="#annotations-revision-notice"]');
     if (!link) return;
     const titleNode = link.querySelector(".toc-title") || link;
+    const zh = titleNode.querySelector(".toc-title-zh");
+    const en = titleNode.querySelector(".toc-title-en");
+    if (zh?.textContent === "修订公告" && en?.textContent === "Revision Notice") return;
     titleNode.innerHTML = '<span class="toc-title-zh">修订公告</span><span class="toc-title-en" lang="en">Revision Notice</span>';
   };
 
   window.addEventListener("DOMContentLoaded", () => {
     decorateRevisionNoticeToc();
     const toc = document.querySelector("#toc");
-    if (toc) new MutationObserver(decorateRevisionNoticeToc).observe(toc, { childList: true, subtree: true });
+    // app.js replaces #toc children when switching documents. Observe only those
+    // direct replacements; observing the whole subtree would also see our own
+    // titleNode.innerHTML update and recursively trigger this callback.
+    if (toc) new MutationObserver(decorateRevisionNoticeToc).observe(toc, { childList: true });
   });
 })();
