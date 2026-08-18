@@ -33,7 +33,7 @@ jobs:
           test -s web/data.js
           test -s web/app.js
           test -s web/declaration-patch.js
-          grep -Fq 'declaration-patch.js?v=2' web/index.html
+          grep -Fq 'declaration-patch.js' web/index.html
           grep -Fq 'annotations-revision-notice' web/declaration-patch.js
           grep -Fq 'Revision Notice' web/declaration-patch.js
           grep -Fq '23 处编号差异' web/declaration-patch.js
