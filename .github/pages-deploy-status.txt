@@ -1,6 +1,6 @@
-deploy_run_id=32151479617
-deploy_sha=dde3fa4492482a3011e284026bb8715e76fd5346
+deploy_run_id=32151627882
+deploy_sha=3ce5ee158389f22897bb8443383664392fcc4dfb
 conclusion=cancelled
-checked_at=2026-08-18T14:59:13Z
+checked_at=2026-08-18T15:00:09Z
 
 --- failed log ---
