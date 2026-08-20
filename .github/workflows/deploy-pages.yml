@@ -33,10 +33,15 @@ jobs:
           test -s web/data.js
           test -s web/app.js
           test -s web/declaration-patch.js
+          node --check web/data.js
+          node --check web/declaration-patch.js
           grep -Fq 'declaration-patch.js' web/index.html
           grep -Fq 'annotations-revision-notice' web/declaration-patch.js
           grep -Fq 'Revision Notice' web/declaration-patch.js
           grep -Fq '23 处编号差异' web/declaration-patch.js
+          grep -Fq '已校正' web/declaration-patch.js
+          ! grep -Fq '待校正' web/declaration-patch.js
+          ! grep -Fq '待校正' web/data.js
 
       - name: 配置 Pages
         uses: actions/configure-pages@v5

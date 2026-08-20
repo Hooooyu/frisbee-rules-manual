@@ -163,7 +163,7 @@ def validate() -> None:
         '"id":"annotations-revision-notice","key":"","title":"关于英文《Official Annotations》中规则引用编号的校订说明"',
         "部分中文注释中的规则编号会有意与英文 Official Annotations PDF 不同",
         "下表完整记录目前确认的 23 处编号差异",
-        "| 23 | 18.15「走步违例后的比赛恢复」标题 | 18.2.7 | 18.2.6 | 待校正 |",
+        "| 23 | 18.15「走步违例后的比赛恢复」标题 | 18.2.7 | 18.2.6 | 已校正 |",
         '"title":"飞盘精神"',
         '"title":"比赛开始"',
         '"title":"开盘"',
@@ -184,7 +184,7 @@ def validate() -> None:
     notice_missing = [
         paragraph["zh"]
         for paragraph in notice["paragraphs"]
-        if paragraph["zh"] not in data
+        if paragraph["zh"].replace("\n", "\\n") not in data
     ]
     if notice_missing:
         raise ValueError(f"规则引用编号校订说明未完整同步：{notice_missing}")
